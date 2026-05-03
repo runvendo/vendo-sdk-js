@@ -11,9 +11,7 @@
     "esModuleInterop": true,
     "declaration": true,
     "declarationMap": false,
-    "outDir": "./dist",
-    "experimentalDecorators": true,
-    "useDefineForClassFields": false
+    "outDir": "./dist"
   },
   "include": ["src/**/*.ts"]
 }

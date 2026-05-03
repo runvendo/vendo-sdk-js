@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import * as sseModule from "../sse-client.js";
 
 // Register the element once before tests run
 let VendoConnectionCardClass: typeof import("./VendoConnectionCard.js").VendoConnectionCard;
@@ -26,7 +27,7 @@ function createElement(attrs: Record<string, string> = {}): InstanceType<typeof 
 }
 
 async function waitRender(): Promise<void> {
-  // Allow Lit to complete its async render cycle
+  // Allow synchronous `_render()` and any microtasks to settle
   await new Promise((r) => setTimeout(r, 10));
 }
 
@@ -91,5 +92,65 @@ describe("<vendo-connection-card>", () => {
     const shadow = el.shadowRoot!;
     expect(shadow.querySelector(".vendo-card__status")?.textContent).toContain("Error");
     expect(shadow.querySelector("button")?.textContent).toContain("Retry");
+  });
+
+  it("escapes XSS payload in display_name — does not render raw <img> tag", async () => {
+    // Simulate server returning a malicious display_name value
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          slug: "telegram",
+          status: "connected",
+          id: "conn-xss",
+          display_name: '<img src=x onerror=alert(1)>',
+          error_message: undefined,
+        },
+      ],
+    } as unknown as Response);
+
+    const el = createElement({ slug: "telegram", "api-key": "vendo_sk_test" });
+    await waitRender();
+
+    const shadow = el.shadowRoot!;
+    // The raw tag must NOT appear — only the escaped version
+    expect(shadow.innerHTML).not.toContain('<img src=x');
+    expect(shadow.innerHTML).toContain('&lt;img');
+  });
+
+  it("escapes XSS payload in error_message", async () => {
+    const el = createElement({ slug: "telegram" });
+    await waitRender();
+    el._setState("error", {
+      id: "conn-xss",
+      displayName: "Telegram",
+      errorMessage: '<script>alert(1)</script>',
+    });
+    await waitRender();
+
+    const shadow = el.shadowRoot!;
+    expect(shadow.innerHTML).not.toContain('<script>');
+    expect(shadow.innerHTML).toContain('&lt;script&gt;');
+  });
+
+  it("restarts fetch and SSE when slug attribute changes", async () => {
+    const openSseSpy = vi.spyOn(sseModule, "openSseStream").mockReturnValue(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    } as unknown as Response);
+
+    const el = createElement({ slug: "telegram", "api-key": "vendo_sk_test" });
+    await waitRender();
+
+    const callsBefore = openSseSpy.mock.calls.length;
+    const fetchCallsBefore = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
+
+    // Change slug — should trigger a new fetch + new SSE stream
+    el.setAttribute("slug", "slack");
+    await waitRender();
+
+    expect(openSseSpy.mock.calls.length).toBeGreaterThan(callsBefore);
+    expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(fetchCallsBefore);
   });
 });

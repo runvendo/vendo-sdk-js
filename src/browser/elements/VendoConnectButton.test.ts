@@ -30,7 +30,7 @@ describe("<vendo-connect-button>", () => {
   it("renders with a button in shadow DOM", async () => {
     const el = createElement({ slug: "telegram", "api-key": "vendo_sk_test" });
     await customElements.whenDefined("vendo-connect-button");
-    // allow one microtask for Lit to render
+    // Allow synchronous `connectedCallback` and any microtasks to settle
     await Promise.resolve();
     const shadow = el.shadowRoot;
     expect(shadow).toBeTruthy();
@@ -107,5 +107,31 @@ describe("<vendo-connect-button>", () => {
     btn.click();
 
     await vi.waitFor(() => expect(redirectedSpy).toHaveBeenCalledOnce());
+  });
+
+  it("does not dispatch events after disconnectedCallback cancels in-flight popup", async () => {
+    // Popup never resolves during the test — simulates a long-running popup
+    let resolvePopup!: (r: { status: "cancelled" }) => void;
+    vi.spyOn(popupModule, "openPopup").mockReturnValue(
+      new Promise<{ status: "cancelled" }>((res) => { resolvePopup = res; }),
+    );
+
+    const el = createElement({ slug: "telegram", "api-key": "vendo_sk_test" });
+    await Promise.resolve();
+
+    const cancelledSpy = vi.fn();
+    el.addEventListener("vendo-cancelled", cancelledSpy);
+
+    const btn = el.shadowRoot!.querySelector("button")!;
+    btn.click(); // starts the in-flight popup
+
+    // Remove element before popup resolves — should cancel in-flight
+    document.body.removeChild(el);
+
+    // Now resolve the popup — event should NOT be dispatched (element is gone + cancelled)
+    resolvePopup({ status: "cancelled" });
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(cancelledSpy).not.toHaveBeenCalled();
   });
 });

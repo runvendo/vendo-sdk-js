@@ -25,6 +25,8 @@ export class VendoConnectButton extends HTMLElement {
 
   private _btn: HTMLButtonElement | null = null;
   private _inFlight = false;
+  /** Cancel function for any in-flight popup; called in disconnectedCallback to prevent leaks. */
+  private _cancelInFlight: (() => void) | null = null;
 
   connectedCallback(): void {
     if (!this.shadowRoot) {
@@ -48,6 +50,12 @@ export class VendoConnectButton extends HTMLElement {
       this._btn = shadow.querySelector("button");
       this._btn?.addEventListener("click", () => void this._handleClick());
     }
+  }
+
+  disconnectedCallback(): void {
+    // Cancel any pending popup so its polling interval/timeout/listener don't outlive the element
+    this._cancelInFlight?.();
+    this._cancelInFlight = null;
   }
 
   attributeChangedCallback(): void {
@@ -82,8 +90,14 @@ export class VendoConnectButton extends HTMLElement {
 
     const url = this._buildConnectUrl();
 
+    let cancelled = false;
+    this._cancelInFlight = () => {
+      cancelled = true;
+    };
+
     try {
       const result = await openPopup({ url, expectedSlug: slug });
+      if (cancelled) return;
 
       switch (result.status) {
         case "connected":
@@ -110,12 +124,15 @@ export class VendoConnectButton extends HTMLElement {
           return; // page is navigating
       }
     } catch (err) {
-      this.dispatchEvent(
-        new CustomEvent("vendo-error", {
-          bubbles: true, composed: true, detail: { error: err },
-        }),
-      );
+      if (!cancelled) {
+        this.dispatchEvent(
+          new CustomEvent("vendo-error", {
+            bubbles: true, composed: true, detail: { error: err },
+          }),
+        );
+      }
     } finally {
+      this._cancelInFlight = null;
       this._inFlight = false;
       if (this._btn) this._btn.disabled = false;
     }
