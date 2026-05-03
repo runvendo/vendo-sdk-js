@@ -15,6 +15,14 @@ interface ConnectionInfo {
   errorMessage?: string;
 }
 
+interface RawConn {
+  slug: string;
+  status: string;
+  id: string;
+  display_name?: string;
+  error_message?: string;
+}
+
 /** Escape HTML special characters to prevent XSS when interpolating server-controlled
  *  strings into innerHTML template literals. */
 function escapeHtml(s: string): string {
@@ -114,13 +122,12 @@ export class VendoConnectionCard extends HTMLElement {
         headers: { Authorization: `Bearer ${key}` },
       });
       if (!res.ok) return;
-      const all = (await res.json()) as Array<{
-        slug: string;
-        status: string;
-        id: string;
-        display_name?: string;
-        error_message?: string;
-      }>;
+      // Backend wire format is { connections: [...] }, not a bare array. Tolerate both
+      // for forward-compat in case a future endpoint flattens the response.
+      const body = (await res.json()) as
+        | Array<RawConn>
+        | { connections?: Array<RawConn> };
+      const all: Array<RawConn> = Array.isArray(body) ? body : body.connections ?? [];
       const conn = all.find((c) => c.slug === slug);
       if (conn) {
         this._connection = {

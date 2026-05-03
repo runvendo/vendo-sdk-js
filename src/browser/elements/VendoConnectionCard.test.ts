@@ -118,6 +118,33 @@ describe("<vendo-connection-card>", () => {
     expect(shadow.innerHTML).toContain('&lt;img');
   });
 
+  it("parses wrapped { connections: [...] } response from /api/deployments/me/connections", async () => {
+    // Backend wire format wraps the array. Earlier code expected a bare array and
+    // silently fell into the catch{}, leaving the card stuck in available state.
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        connections: [
+          {
+            slug: "telegram",
+            status: "connected",
+            id: "uuid-real",
+            display_name: "My Bot",
+          },
+        ],
+      }),
+    } as unknown as Response);
+
+    const el = createElement({ slug: "telegram", "api-key": "vendo_sk_test" });
+    await waitRender();
+    await new Promise((r) => setTimeout(r, 10));
+    await waitRender();
+
+    const shadow = el.shadowRoot!;
+    expect(shadow.querySelector(".vendo-card__name")?.textContent).toContain("My Bot");
+    expect(shadow.querySelector(".vendo-card__status")?.textContent).toContain("Connected");
+  });
+
   it("escapes XSS payload in error_message", async () => {
     const el = createElement({ slug: "telegram" });
     await waitRender();
