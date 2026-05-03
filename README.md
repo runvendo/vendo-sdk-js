@@ -102,6 +102,82 @@ const { access_token } = await getCredential("notion");
 
 Prefer the `Vendo` class for new code — it's cache-aware, retries, and supports the full surface.
 
+## Browser / Web Components
+
+For vanilla HTML pages (no React or framework required), the `@vendodev/sdk/browser` entry ships two custom elements that implement the same popup connect flow as `@vendodev/connect-portal`.
+
+Bundle size: ~4.2 KB gzipped (zero framework dependencies).
+
+### CDN usage
+
+```html
+<script type="module" src="https://cdn.jsdelivr.net/npm/@vendodev/sdk/dist/browser/index.js"></script>
+```
+
+The elements register automatically on import. No `register()` call needed.
+
+### `<vendo-connect-button>`
+
+```html
+<meta name="vendo-api-key" content="vendo_sk_..." />
+
+<vendo-connect-button slug="telegram">
+  Connect Telegram
+</vendo-connect-button>
+
+<script type="module">
+  document.querySelector('vendo-connect-button')
+    .addEventListener('vendo-connected', (e) => {
+      console.log('Connected!', e.detail.connectionId);
+    });
+</script>
+```
+
+Attributes:
+- `slug` (required) — integration to connect
+- `api-key` (optional) — `vendo_sk_*` key; falls back to `<meta name="vendo-api-key">` then `window.Vendo.apiKey`
+- `return-to` (optional) — URL to return to after connect; defaults to `window.location.href`
+- `base-url` (optional) — defaults to `https://vendo.run`
+
+Events:
+- `vendo-connected` — `{ slug, connectionId }` — popup completed
+- `vendo-cancelled` — user closed the popup
+- `vendo-timeout` — popup timed out (default 5 min)
+- `vendo-redirected` — `{ url }` — popup was blocked; page navigated instead
+- `vendo-error` — `{ error }` — unexpected error
+
+CSS custom properties: `--vendo-color-brand`, `--vendo-radius`.
+
+### `<vendo-connection-card>`
+
+```html
+<vendo-connection-card
+  slug="telegram"
+  api-key="vendo_sk_..."
+></vendo-connection-card>
+```
+
+Renders one of 6 states (`available`, `connecting`, `pending_setup`, `connected`, `needs_reauth`, `error`) and auto-updates via SSE.
+
+Attributes:
+- `slug`, `api-key`, `base-url` — same as above
+- `manage-base-url` (optional) — dashboard origin override
+- `compact` (boolean) — compact layout (~50 px tall)
+
+Events: `vendo-connected` `{ connectionId }`, `vendo-disconnected` `{ connectionId }`.
+
+CSS custom properties: `--vendo-color-brand`, `--vendo-color-border`, `--vendo-color-surface`, `--vendo-color-muted`, `--vendo-color-success`, `--vendo-color-warning`, `--vendo-color-error`, `--vendo-radius`.
+
+### ESM import
+
+```js
+import { register, VendoConnectButton, VendoConnectionCard } from "@vendodev/sdk/browser";
+
+// register() is already called as a side-effect of the import above.
+// Call it explicitly only if you need to guard against double-registration in SSR-like environments.
+register();
+```
+
 ## License
 
 MIT.
