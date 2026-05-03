@@ -19,7 +19,11 @@
       }
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
     "test": "vitest run",
@@ -36,7 +40,13 @@
   },
   "homepage": "https://vendo.run",
   "bugs": "https://github.com/runvendo/vendo-sdk-js/issues",
-  "keywords": ["vendo", "sdk", "oauth", "credentials", "deployment"],
+  "keywords": [
+    "vendo",
+    "sdk",
+    "oauth",
+    "credentials",
+    "deployment"
+  ],
   "engines": {
     "node": ">=18"
   },
@@ -44,6 +54,7 @@
     "@types/node": "^20.16.0",
     "tsup": "^8.3.5",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "yaml": "^2.8.4"
   }
 }
