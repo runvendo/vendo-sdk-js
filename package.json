@@ -1,7 +1,7 @@
 {
   "name": "@vendodev/sdk",
   "version": "0.1.0",
-  "description": "Vendo platform SDK — fetch fresh OAuth credentials inside Vendo deployments",
+  "description": "Vendo TypeScript SDK — runtime contract for apps deployed via Vendo",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.cjs",
@@ -36,7 +36,7 @@
   },
   "homepage": "https://vendo.run",
   "bugs": "https://github.com/runvendo/vendo-sdk-js/issues",
-  "keywords": ["vendo", "oauth", "credentials", "google", "notion"],
+  "keywords": ["vendo", "sdk", "oauth", "credentials", "deployment"],
   "engines": {
     "node": ">=18"
   },
