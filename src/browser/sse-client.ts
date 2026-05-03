@@ -10,8 +10,15 @@ export interface SseEvent {
 export type SseHandler = (event: SseEvent) => void;
 export type SseCleanup = () => void;
 
-/** Open an SSE stream.  Returns a cleanup function that aborts the stream. */
-export function openSseStream(url: string, apiKey: string, onEvent: SseHandler): SseCleanup {
+/** Open an SSE stream.  Returns a cleanup function that aborts the stream.
+ *  @param onError — called on non-OK HTTP responses (4xx/5xx); stream does not retry.
+ */
+export function openSseStream(
+  url: string,
+  apiKey: string,
+  onEvent: SseHandler,
+  onError?: (err: Error) => void,
+): SseCleanup {
   const controller = new AbortController();
 
   void (async () => {
@@ -24,7 +31,13 @@ export function openSseStream(url: string, apiKey: string, onEvent: SseHandler):
         signal: controller.signal,
       });
 
-      if (!res.ok || !res.body) return;
+      if (!res.ok || !res.body) {
+        // Signal auth/client errors so callers can react (e.g. surface a warning)
+        if (!res.ok) {
+          onError?.(new Error(`SSE auth/client error: ${res.status}`));
+        }
+        return;
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -34,7 +47,10 @@ export function openSseStream(url: string, apiKey: string, onEvent: SseHandler):
         const { done, value } = await reader.read();
         if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
+        // Normalise CR+LF and bare CR to LF so the SSE line-split works uniformly
+        let chunk = decoder.decode(value, { stream: true });
+        chunk = chunk.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        buffer += chunk;
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
 
@@ -42,6 +58,9 @@ export function openSseStream(url: string, apiKey: string, onEvent: SseHandler):
         let dataLines: string[] = [];
 
         for (const line of lines) {
+          // Skip SSE comment / heartbeat lines (start with ':')
+          if (line.startsWith(":")) continue;
+
           if (line.startsWith("event:")) {
             eventType = line.slice(6).trim();
           } else if (line.startsWith("data:")) {

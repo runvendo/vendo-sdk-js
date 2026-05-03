@@ -15,6 +15,17 @@ interface ConnectionInfo {
   errorMessage?: string;
 }
 
+/** Escape HTML special characters to prevent XSS when interpolating server-controlled
+ *  strings into innerHTML template literals. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /** <vendo-connection-card> — Vanilla Web Component (no Lit) mirroring ConnectionCard (React).
  *  Fetches live state from the Vendo API and opens an SSE stream for real-time updates.
  *
@@ -42,6 +53,8 @@ export class VendoConnectionCard extends HTMLElement {
   private _displayName = "";
   private _sseCleanup: SseCleanup | null = null;
   private _shadow: ShadowRoot | null = null;
+  /** Cancel function for any in-flight popup; called in disconnectedCallback to prevent leaks. */
+  private _cancelInFlight: (() => void) | null = null;
 
   connectedCallback(): void {
     if (!this.shadowRoot) {
@@ -59,9 +72,26 @@ export class VendoConnectionCard extends HTMLElement {
   disconnectedCallback(): void {
     this._sseCleanup?.();
     this._sseCleanup = null;
+    // Cancel any pending popup to stop its polling interval/timeout/listener
+    this._cancelInFlight?.();
+    this._cancelInFlight = null;
   }
 
-  attributeChangedCallback(): void {
+  attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
+    // When slug or api-key changes to a different value, restart fetch + SSE from scratch
+    if ((name === "slug" || name === "api-key") && oldValue !== newValue && oldValue !== null) {
+      this._sseCleanup?.();
+      this._sseCleanup = null;
+      this._status = "available";
+      this._connection = null;
+      this._displayName = "";
+      const slug = this.getAttribute("slug");
+      const apiKey = this._resolveApiKey();
+      if (slug && apiKey) {
+        void this._fetchState();
+        this._openSse();
+      }
+    }
     this._render();
   }
 
@@ -127,6 +157,8 @@ export class VendoConnectionCard extends HTMLElement {
           }
         }
       },
+      // SSE auth errors are non-fatal — card stays usable; live updates simply won't arrive
+      (err) => console.warn("[vendo-connection-card] SSE error:", err.message),
     );
   }
 
@@ -153,8 +185,18 @@ export class VendoConnectionCard extends HTMLElement {
     this._status = "connecting";
     this._render();
     const url = this._buildConnectUrl();
+
+    let abortController: AbortController | null = new AbortController();
+    let cancelled = false;
+    this._cancelInFlight = () => {
+      cancelled = true;
+      abortController?.abort();
+      abortController = null;
+    };
+
     try {
       const result = await openPopup({ url, expectedSlug: slug });
+      if (cancelled) return;
       if (result.status === "connected") {
         this._status = "connected";
         this._connection = { id: result.connectionId };
@@ -172,9 +214,11 @@ export class VendoConnectionCard extends HTMLElement {
         this._status = "available";
       }
     } catch {
-      this._status = "error";
+      if (!cancelled) this._status = "error";
+    } finally {
+      this._cancelInFlight = null;
     }
-    this._render();
+    if (!cancelled) this._render();
   }
 
   private _handleManage(): void {
@@ -202,7 +246,9 @@ export class VendoConnectionCard extends HTMLElement {
       case "needs_reauth":
         return `<span class="vendo-card__status vendo-card__status--warning">● Reauth needed</span>`;
       case "error": {
-        const msg = this._connection?.errorMessage ? `: ${this._connection.errorMessage.slice(0, 60)}` : "";
+        // errorMessage is server-supplied — escape to prevent XSS via stored content
+        const raw = this._connection?.errorMessage ?? "";
+        const msg = raw ? `: ${escapeHtml(raw.slice(0, 60))}` : "";
         return `<span class="vendo-card__status vendo-card__status--error">● Error${msg}</span>`;
       }
       default: return "";
@@ -241,7 +287,8 @@ export class VendoConnectionCard extends HTMLElement {
     const shadow = this._shadow ?? this.shadowRoot;
     if (!shadow) return;
 
-    const displayName = this._displayName || (this.getAttribute("slug") ?? "");
+    // displayName is server-supplied — escape to prevent XSS via stored display_name values
+    const displayName = escapeHtml(this._displayName || (this.getAttribute("slug") ?? ""));
     const compact = this.hasAttribute("compact");
 
     shadow.innerHTML = `
