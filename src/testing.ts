@@ -1,6 +1,37 @@
 import type { ConnectionStatus } from "./connections";
 import { NotConnected } from "./errors";
 
+// ---------------------------------------------------------------------------
+// MockSSE — scripted SSE event emitter for tests
+// ---------------------------------------------------------------------------
+
+export interface SSEEvent {
+  id?: string;
+  at?: string;
+  kind: string;
+  [key: string]: unknown;
+}
+
+export class MockSSE {
+  private events: SSEEvent[];
+
+  constructor(events: SSEEvent[] = []) {
+    this.events = [...events];
+  }
+
+  push(event: SSEEvent): void {
+    this.events.push(event);
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<SSEEvent> {
+    for (const ev of this.events) yield ev;
+  }
+
+  *[Symbol.iterator](): Iterator<SSEEvent> {
+    for (const ev of this.events) yield ev;
+  }
+}
+
 export interface FakeConnection {
   slug: string;
   status: ConnectionStatus;

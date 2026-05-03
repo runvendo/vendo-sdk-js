@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MockClient, fakeConnection } from "./testing";
+import { MockClient, fakeConnection, MockSSE } from "./testing";
 import { NotConnected } from "./errors";
 
 describe("MockClient", () => {
@@ -35,5 +35,45 @@ describe("MockClient", () => {
       name: "NotConnected",
       code: "binding_missing",
     });
+  });
+});
+
+describe("MockSSE", () => {
+  it("iterates synchronously with for...of", () => {
+    const events = [
+      { kind: "connection.connected", slug: "telegram" },
+      { kind: "connection.disconnected", slug: "notion" },
+    ];
+    const sse = new MockSSE(events);
+    const collected: unknown[] = [];
+    for (const ev of sse) {
+      collected.push(ev);
+    }
+    expect(collected).toHaveLength(2);
+    expect(collected[0]).toMatchObject({ kind: "connection.connected" });
+    expect(collected[1]).toMatchObject({ slug: "notion" });
+  });
+
+  it("iterates asynchronously with for await...of", async () => {
+    const events = [
+      { kind: "billing.balance_low" },
+      { kind: "connection.connected", slug: "github" },
+    ];
+    const sse = new MockSSE(events);
+    const collected: unknown[] = [];
+    for await (const ev of sse) {
+      collected.push(ev);
+    }
+    expect(collected).toHaveLength(2);
+    expect(collected[0]).toMatchObject({ kind: "billing.balance_low" });
+    expect(collected[1]).toMatchObject({ kind: "connection.connected" });
+  });
+
+  it(".push() appends an event", () => {
+    const sse = new MockSSE([{ kind: "initial" }]);
+    sse.push({ kind: "appended", slug: "stripe" });
+    const collected = [...sse];
+    expect(collected).toHaveLength(2);
+    expect(collected[1]).toMatchObject({ kind: "appended", slug: "stripe" });
   });
 });
