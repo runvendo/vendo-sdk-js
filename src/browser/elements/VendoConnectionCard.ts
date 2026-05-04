@@ -2,6 +2,7 @@ import { openPopup } from "../popup.js";
 import { openSseStream, type SseCleanup } from "../sse-client.js";
 
 type CardStatus =
+  | "loading"
   | "available"
   | "connecting"
   | "pending_setup"
@@ -25,8 +26,6 @@ interface RawConn {
   brand_color?: string;
 }
 
-/** Escape HTML special characters to prevent XSS when interpolating server-controlled
- *  strings into innerHTML template literals. */
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -36,44 +35,80 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+const THEMES: Record<string, string> = {
+  default: `
+    --vendo-color-brand: #2B7A5E;
+    --vendo-color-border: #E6DDD0;
+    --vendo-color-surface: #FFFFFF;
+    --vendo-color-text: #000000;
+    --vendo-color-muted: #6B6B65;
+    --vendo-color-success: #3A8B52;
+    --vendo-color-warning: #C4922A;
+    --vendo-color-error: #C44B3B;
+    --vendo-color-skeleton: #E6DDD0;
+    --vendo-radius: 8px;
+  `,
+  beige: `
+    --vendo-color-brand: #2B7A5E;
+    --vendo-color-border: #D5C9B8;
+    --vendo-color-surface: #FAF7F2;
+    --vendo-color-text: #1C1B18;
+    --vendo-color-muted: #6B6B65;
+    --vendo-color-success: #3A8B52;
+    --vendo-color-warning: #C4922A;
+    --vendo-color-error: #C44B3B;
+    --vendo-color-skeleton: #D5C9B8;
+    --vendo-radius: 8px;
+  `,
+  dark: `
+    --vendo-color-brand: #4D9E7C;
+    --vendo-color-border: #35342F;
+    --vendo-color-surface: #1C1B18;
+    --vendo-color-text: #F3EEE6;
+    --vendo-color-muted: #A59885;
+    --vendo-color-success: #4D9E7C;
+    --vendo-color-warning: #DBA83A;
+    --vendo-color-error: #E5796A;
+    --vendo-color-skeleton: #35342F;
+    --vendo-radius: 8px;
+  `,
+};
+
 /** <vendo-connection-card> — Vanilla Web Component (no Lit) mirroring ConnectionCard (React).
- *  Fetches live state from the Vendo API and opens an SSE stream for real-time updates.
  *
  *  Attributes:
  *   slug             (required) — integration slug
+ *   name             (optional) — human-readable integration name (title); falls back to slug
  *   api-key          (optional) — vendo_sk_* key
- *   base-url         (optional) — defaults to https://vendo.run
+ *   base-url         (optional) — API base (empty = same-origin proxy); defaults to https://vendo.run
+ *   connect-origin   (optional) — origin for OAuth popups + manage links; defaults to https://vendo.run
  *   manage-base-url  (optional) — override for the dashboard origin
+ *   theme            (optional) — "default" | "beige" | "dark"
  *   compact          (boolean)  — compact layout
- *
- *  Events dispatched:
- *   vendo-connected     { connectionId }
- *   vendo-disconnected  { connectionId }
- *
- *  CSS custom properties:
- *   --vendo-color-brand, --vendo-color-border, --vendo-color-surface,
- *   --vendo-color-muted, --vendo-color-success, --vendo-color-warning,
- *   --vendo-color-error, --vendo-radius
+ *   logo-url         (optional) — logo image URL
+ *   brand-color      (optional) — hex color for left accent border
  */
 export class VendoConnectionCard extends HTMLElement {
   static observedAttributes = [
     "slug",
+    "name",
     "api-key",
     "base-url",
+    "connect-origin",
     "manage-base-url",
     "compact",
     "logo-url",
     "brand-color",
+    "theme",
   ];
 
-  private _status: CardStatus = "available";
+  private _status: CardStatus = "loading";
   private _connection: ConnectionInfo | null = null;
   private _displayName = "";
   private _logoUrl = "";
   private _brandColor = "";
   private _sseCleanup: SseCleanup | null = null;
   private _shadow: ShadowRoot | null = null;
-  /** Cancel function for any in-flight popup; called in disconnectedCallback to prevent leaks. */
   private _cancelInFlight: (() => void) | null = null;
 
   connectedCallback(): void {
@@ -94,17 +129,15 @@ export class VendoConnectionCard extends HTMLElement {
   disconnectedCallback(): void {
     this._sseCleanup?.();
     this._sseCleanup = null;
-    // Cancel any pending popup to stop its polling interval/timeout/listener
     this._cancelInFlight?.();
     this._cancelInFlight = null;
   }
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
-    // When slug or api-key changes to a different value, restart fetch + SSE from scratch
     if ((name === "slug" || name === "api-key") && oldValue !== newValue && oldValue !== null) {
       this._sseCleanup?.();
       this._sseCleanup = null;
-      this._status = "available";
+      this._status = "loading";
       this._connection = null;
       this._displayName = "";
       const slug = this.getAttribute("slug");
@@ -128,18 +161,42 @@ export class VendoConnectionCard extends HTMLElement {
     return ((window as any).Vendo?.apiKey as string | undefined) ?? "";
   }
 
+  private _apiBaseUrl(): string {
+    return this.getAttribute("base-url") ?? "https://vendo.run";
+  }
+
+  private _connectOrigin(): string {
+    return this.getAttribute("connect-origin")?.trim()
+      || this.getAttribute("base-url")?.trim()
+      || "https://vendo.run";
+  }
+
+  private _resolveLogoUrl(raw: string): string {
+    if (!raw) return "";
+    if (/^https?:\/\//i.test(raw)) return raw;
+    if (raw.startsWith("/")) {
+      const origin = this._connectOrigin();
+      return `${origin}${raw}`;
+    }
+    return "";
+  }
+
   private async _fetchState(): Promise<void> {
     const key = this._resolveApiKey();
-    const baseUrl = this.getAttribute("base-url") || "https://vendo.run";
+    const baseUrl = this._apiBaseUrl();
     const slug = this.getAttribute("slug") ?? "";
     if (!key) return;
     try {
       const res = await fetch(`${baseUrl}/api/deployments/me/connections`, {
         headers: { Authorization: `Bearer ${key}` },
       });
-      if (!res.ok) return;
-      // Backend wire format is { connections: [...] }, not a bare array. Tolerate both
-      // for forward-compat in case a future endpoint flattens the response.
+      if (!res.ok) {
+        if (this._status === "loading") {
+          this._status = "available";
+          this._render();
+        }
+        return;
+      }
       const body = (await res.json()) as
         | Array<RawConn>
         | { connections?: Array<RawConn> };
@@ -153,19 +210,23 @@ export class VendoConnectionCard extends HTMLElement {
         };
         this._status = (conn.status as CardStatus) ?? "available";
         this._displayName = conn.display_name ?? slug;
-        // Prefer server-supplied branding when present; fall back to attribute-set values
-        if (conn.logo_url) this._logoUrl = conn.logo_url;
-        if (conn.brand_color) this._brandColor = conn.brand_color;
+        if (conn.logo_url && !this.getAttribute("logo-url")) this._logoUrl = conn.logo_url;
+        if (conn.brand_color && !this.getAttribute("brand-color")) this._brandColor = conn.brand_color;
+      } else {
+        this._status = "available";
       }
       this._render();
     } catch {
-      // Network error; leave current state
+      if (this._status === "loading") {
+        this._status = "available";
+        this._render();
+      }
     }
   }
 
   private _openSse(): void {
     const key = this._resolveApiKey();
-    const baseUrl = this.getAttribute("base-url") || "https://vendo.run";
+    const baseUrl = this._apiBaseUrl();
     const slug = this.getAttribute("slug") ?? "";
     if (!key) return;
     this._sseCleanup = openSseStream(
@@ -183,12 +244,10 @@ export class VendoConnectionCard extends HTMLElement {
           }
         }
       },
-      // SSE auth errors are non-fatal — card stays usable; live updates simply won't arrive
       (err) => console.warn("[vendo-connection-card] SSE error:", err.message),
     );
   }
 
-  /** Test helper — drive displayed state directly without network calls. */
   _setState(status: CardStatus, connection?: ConnectionInfo): void {
     this._status = status;
     this._connection = connection ?? null;
@@ -198,12 +257,12 @@ export class VendoConnectionCard extends HTMLElement {
 
   private _buildConnectUrl(): string {
     const key = this._resolveApiKey();
-    const baseUrl = this.getAttribute("base-url") || "https://vendo.run";
+    const origin = this._connectOrigin();
     const slug = this.getAttribute("slug") ?? "";
     const params = new URLSearchParams();
     if (key) params.set("app_key", key);
     params.set("return_to", window.location.href);
-    return `${baseUrl}/connections/connect/${slug}?${params.toString()}`;
+    return `${origin}/connections/connect/${slug}?${params.toString()}`;
   }
 
   private async _handleConnect(): Promise<void> {
@@ -249,9 +308,9 @@ export class VendoConnectionCard extends HTMLElement {
 
   private _handleManage(): void {
     if (!this._connection) return;
-    const baseUrl = this.getAttribute("base-url") || "https://vendo.run";
-    const manageBaseUrl = this.getAttribute("manage-base-url") || baseUrl.replace(/\/api\/?$/, "");
-    const url = `${manageBaseUrl}/dashboard/connections/${this._connection.id}`;
+    const origin = this._connectOrigin();
+    const manageBaseUrl = this.getAttribute("manage-base-url") || origin.replace(/\/api\/?$/, "");
+    const url = `${manageBaseUrl}/connections/${this._connection.id}`;
     window.open(url, "vendo-manage", "width=960,height=720,popup");
   }
 
@@ -262,6 +321,7 @@ export class VendoConnectionCard extends HTMLElement {
 
   private _renderStatus(): string {
     switch (this._status) {
+      case "loading": return "";
       case "available": return "";
       case "connecting":
         return `<span class="vendo-card__status"><span class="spinner"></span> Connecting…</span>`;
@@ -272,7 +332,6 @@ export class VendoConnectionCard extends HTMLElement {
       case "needs_reauth":
         return `<span class="vendo-card__status vendo-card__status--warning">● Reauth needed</span>`;
       case "error": {
-        // errorMessage is server-supplied — escape to prevent XSS via stored content
         const raw = this._connection?.errorMessage ?? "";
         const msg = raw ? `: ${escapeHtml(raw.slice(0, 60))}` : "";
         return `<span class="vendo-card__status vendo-card__status--error">● Error${msg}</span>`;
@@ -283,6 +342,8 @@ export class VendoConnectionCard extends HTMLElement {
 
   private _renderActions(): string {
     switch (this._status) {
+      case "loading":
+        return `<div class="vendo-card__skeleton vendo-card__skeleton--btn"></div>`;
       case "available":
         return `<button data-action="connect">Connect</button>`;
       case "connecting":
@@ -293,7 +354,7 @@ export class VendoConnectionCard extends HTMLElement {
           <button class="secondary" data-action="cancel">Cancel</button>
         `;
       case "connected":
-        return `<button data-action="manage">Manage</button>`;
+        return `<button class="secondary" data-action="manage">Manage</button>`;
       case "needs_reauth":
         return `
           <button data-action="connect">Reconnect</button>
@@ -314,58 +375,78 @@ export class VendoConnectionCard extends HTMLElement {
     if (!shadow) return;
 
     const slug = this.getAttribute("slug") ?? "";
-    // displayName is server-supplied — escape to prevent XSS via stored display_name values
-    const displayName = escapeHtml(this._displayName || slug);
+    const integrationName = escapeHtml(this.getAttribute("name") || slug);
+    const subtitle = this._displayName && this._displayName !== slug && this._displayName !== (this.getAttribute("name") || "")
+      ? escapeHtml(this._displayName)
+      : "";
     const compact = this.hasAttribute("compact");
-    // Only allow http(s) logo URLs to prevent javascript: / data: URI smuggling
-    const safeLogoUrl = /^https?:\/\//i.test(this._logoUrl) ? this._logoUrl : "";
-    // Brand color must look like #rgb / #rrggbb — never let arbitrary strings into a style attr
+    const safeLogoUrl = this._resolveLogoUrl(this._logoUrl);
     const safeBrandColor = /^#[0-9a-fA-F]{3,8}$/.test(this._brandColor) ? this._brandColor : "";
     const logoSize = compact ? "1.5rem" : "2rem";
-    const logoHtml = safeLogoUrl
-      ? `<img class="vendo-card__logo" src="${escapeHtml(safeLogoUrl)}" alt="" aria-hidden="true" />`
-      : `<div class="vendo-card__logo vendo-card__logo--fallback" aria-hidden="true">${escapeHtml((displayName.charAt(0) || "?").toUpperCase())}</div>`;
+    const isLoading = this._status === "loading";
+
+    const themeName = this.getAttribute("theme") || "default";
+    const themeVars = THEMES[themeName] || THEMES["default"];
+
+    let logoHtml: string;
+    if (isLoading) {
+      logoHtml = `<div class="vendo-card__logo vendo-card__skeleton vendo-card__skeleton--logo" aria-hidden="true"></div>`;
+    } else if (safeLogoUrl) {
+      logoHtml = `<img class="vendo-card__logo" src="${escapeHtml(safeLogoUrl)}" alt="" aria-hidden="true" />`;
+    } else {
+      logoHtml = `<div class="vendo-card__logo vendo-card__logo--fallback" aria-hidden="true">${escapeHtml((integrationName.charAt(0) || "?").toUpperCase())}</div>`;
+    }
     const accentStyle = safeBrandColor ? ` style="border-left-color: ${safeBrandColor};"` : "";
+
+    const subtitleHtml = subtitle
+      ? `<div class="vendo-card__subtitle">${subtitle}</div>`
+      : "";
 
     shadow.innerHTML = `
       <style>
-        :host { display: block; font-family: inherit; }
+        :host { display: block; font-family: inherit; ${themeVars} }
         .vendo-card {
           display: flex; align-items: center; gap: 0.75rem;
           padding: ${compact ? "0.5rem 0.75rem" : "1rem"};
-          border: 1px solid var(--vendo-color-border, #e2e8f0);
-          border-left: 3px solid var(--vendo-color-border, #e2e8f0);
-          border-radius: var(--vendo-radius, 8px);
-          background: var(--vendo-color-surface, #fff);
+          border: 1px solid var(--vendo-color-border);
+          border-left: 3px solid var(--vendo-color-border);
+          border-radius: var(--vendo-radius);
+          background: var(--vendo-color-surface);
+          color: var(--vendo-color-text);
+          transition: border-left-color 0.2s, box-shadow 0.2s;
+        }
+        .vendo-card:hover {
+          box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         }
         .vendo-card__logo {
           width: ${logoSize}; height: ${logoSize};
           flex-shrink: 0; border-radius: 6px; object-fit: contain;
-          background: var(--vendo-color-surface, #fff);
+          background: #fff; padding: 2px;
         }
         .vendo-card__logo--fallback {
           display: inline-flex; align-items: center; justify-content: center;
-          background: var(--vendo-color-border, #e2e8f0);
-          color: var(--vendo-color-muted, #64748b);
+          background: var(--vendo-color-border);
+          color: var(--vendo-color-muted);
           font-weight: 700; font-size: 0.85rem;
         }
         .vendo-card__info { flex: 1; min-width: 0; }
         .vendo-card__name { font-weight: 600; font-size: 0.9rem; }
-        .vendo-card__status { font-size: 0.78rem; color: var(--vendo-color-muted, #64748b); margin-top: 0.15rem; display: block; }
-        .vendo-card__status--connected { color: var(--vendo-color-success, #16a34a); }
-        .vendo-card__status--warning { color: var(--vendo-color-warning, #d97706); }
-        .vendo-card__status--error { color: var(--vendo-color-error, #dc2626); }
+        .vendo-card__subtitle { font-size: 0.78rem; color: var(--vendo-color-muted); margin-top: 0.1rem; }
+        .vendo-card__status { font-size: 0.78rem; color: var(--vendo-color-muted); margin-top: 0.15rem; display: block; }
+        .vendo-card__status--connected { color: var(--vendo-color-success); }
+        .vendo-card__status--warning { color: var(--vendo-color-warning); }
+        .vendo-card__status--error { color: var(--vendo-color-error); }
         .vendo-card__actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
         button {
           padding: 0.35em 0.85em; border: none;
           border-radius: var(--vendo-radius, 6px);
-          background: var(--vendo-color-brand, #6c47ff);
+          background: var(--vendo-color-brand);
           color: #fff; font-family: inherit; font-size: 0.82rem;
           font-weight: 600; cursor: pointer; transition: opacity 0.15s;
         }
         button:hover { opacity: 0.88; }
         button.secondary {
-          background: transparent; color: var(--vendo-color-muted, #64748b);
+          background: transparent; color: var(--vendo-color-muted);
           border: 1px solid currentColor;
         }
         .spinner {
@@ -374,12 +455,38 @@ export class VendoConnectionCard extends HTMLElement {
           border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .vendo-card__skeleton {
+          border-radius: 4px;
+          background: linear-gradient(
+            90deg,
+            var(--vendo-color-skeleton) 25%,
+            color-mix(in srgb, var(--vendo-color-skeleton), transparent 40%) 50%,
+            var(--vendo-color-skeleton) 75%
+          );
+          background-size: 200% 100%;
+          animation: shimmer 1.5s ease-in-out infinite;
+        }
+        .vendo-card__skeleton--logo {
+          width: ${logoSize}; height: ${logoSize}; flex-shrink: 0;
+        }
+        .vendo-card__skeleton--name {
+          height: 0.9rem; width: 7rem; border-radius: 4px;
+        }
+        .vendo-card__skeleton--btn {
+          height: 1.8rem; width: 4.5rem; border-radius: var(--vendo-radius, 6px);
+        }
       </style>
       <div class="vendo-card"${accentStyle}>
         ${logoHtml}
         <div class="vendo-card__info">
-          <div class="vendo-card__name">${displayName}</div>
-          ${this._renderStatus()}
+          ${isLoading
+            ? `<div class="vendo-card__skeleton vendo-card__skeleton--name"></div>`
+            : `<div class="vendo-card__name">${integrationName}</div>${subtitleHtml}${this._renderStatus()}`
+          }
         </div>
         <div class="vendo-card__actions">
           ${this._renderActions()}
@@ -387,7 +494,6 @@ export class VendoConnectionCard extends HTMLElement {
       </div>
     `;
 
-    // Wire button event handlers after innerHTML update
     shadow.querySelectorAll<HTMLButtonElement>("button[data-action]").forEach((btn) => {
       const action = btn.dataset["action"];
       if (action === "connect") btn.addEventListener("click", () => void this._handleConnect());

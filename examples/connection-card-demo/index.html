@@ -15,6 +15,13 @@
       <span class="key-pill" id="keyPill">checking key…</span>
     </header>
 
+    <section class="theme-bar">
+      <label>Theme:</label>
+      <button class="theme-btn active" data-theme="default">Default</button>
+      <button class="theme-btn" data-theme="beige">Beige</button>
+      <button class="theme-btn" data-theme="dark">Dark</button>
+    </section>
+
     <section class="demo-grid">
       <div class="column">
         <h2>Live SDK <span class="count" id="sdkCount">…</span></h2>
@@ -37,9 +44,7 @@
         <!-- Hand-copied static reference. Source of truth: web/src/components/connections/ConnectionsCatalog.tsx -->
         <div class="cards-stack">
           <div class="ref-card">
-            <span class="ref-card__logo">
-              <img src="https://logo.clearbit.com/telegram.org" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'T'}))" />
-            </span>
+            <span class="ref-card__logo" style="background:#229ED9;color:#fff">T</span>
             <div class="ref-card__main">
               <div class="ref-card__title">
                 Telegram
@@ -50,9 +55,7 @@
             <button class="ref-card__btn">Manage</button>
           </div>
           <div class="ref-card">
-            <span class="ref-card__logo">
-              <img src="https://logo.clearbit.com/openai.com" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'O'}))" />
-            </span>
+            <span class="ref-card__logo" style="background:#10A37F;color:#fff">O</span>
             <div class="ref-card__main">
               <div class="ref-card__title">
                 OpenAI
@@ -63,9 +66,7 @@
             <button class="ref-card__btn ref-card__btn--primary">Connect</button>
           </div>
           <div class="ref-card">
-            <span class="ref-card__logo">
-              <img src="https://logo.clearbit.com/notion.so" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'N'}))" />
-            </span>
+            <span class="ref-card__logo" style="background:#000;color:#fff">N</span>
             <div class="ref-card__main">
               <div class="ref-card__title">
                 Notion
@@ -96,11 +97,6 @@
     </section>
 
     <script type="module">
-      // Mirrors hermes-webui's vendo-bootstrap.js: import Vendo from the main
-      // entry, then side-effect import /dist/browser/index.js which auto-
-      // registers <vendo-connection-card> and friends. Both come from the
-      // SDK's own dist/ via the demo server. Expects `npm run build` (or
-      // `npm run build -- --watch`) in the SDK repo root.
       import { Vendo as VendoClass } from "/dist/index.js";
       import "/dist/browser/index.js";
 
@@ -116,9 +112,6 @@
 
       document.getElementById("hostMeta").textContent = `origin: ${location.origin}`;
 
-      // Empty baseUrl → all /api/* requests go same-origin (through `vendo dev`).
-      // bind fetch to globalThis — same workaround vendo-bootstrap.js uses for
-      // SDK 0.3.0's internal `this.fetch(...)` invocation pattern.
       const Vendo = new VendoClass({
         apiKey,
         baseUrl: "",
@@ -161,13 +154,30 @@
         for (const it of integrations) {
           const card = document.createElement("vendo-connection-card");
           card.setAttribute("slug", it.slug);
+          if (it.name) card.setAttribute("name", it.name);
           card.setAttribute("base-url", "");
+          card.setAttribute("connect-origin", "https://vendo.run");
           if (it.logoUrl) card.setAttribute("logo-url", it.logoUrl);
           if (it.brandColor) card.setAttribute("brand-color", it.brandColor);
           cardsEl.appendChild(card);
           probeSlug.appendChild(new Option(it.slug, it.slug));
         }
       }
+
+      // Theme switcher
+      let currentTheme = "default";
+      document.querySelectorAll(".theme-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          currentTheme = btn.dataset.theme;
+          document.querySelectorAll(".theme-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          document.querySelectorAll("vendo-connection-card").forEach((card) => {
+            card.setAttribute("theme", currentTheme);
+          });
+          // Toggle body dark class for demo chrome
+          document.body.classList.toggle("demo-dark", currentTheme === "dark");
+        });
+      });
 
       // Probe row
       document.querySelectorAll("[data-probe]").forEach((btn) => {
@@ -193,8 +203,6 @@
         });
       });
 
-      // Surface SDK connection events for visibility while debugging the
-      // "card doesn't update post-connect" bug.
       window.addEventListener("vendo-connected", (e) => console.log("[demo] vendo-connected", e.detail));
       window.addEventListener("vendo-disconnected", (e) => console.log("[demo] vendo-disconnected", e.detail));
     </script>

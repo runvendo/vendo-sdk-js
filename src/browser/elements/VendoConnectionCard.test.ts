@@ -32,12 +32,23 @@ async function waitRender(): Promise<void> {
 }
 
 describe("<vendo-connection-card>", () => {
-  it("renders in available state by default", async () => {
+  it("renders loading skeleton initially before fetch completes", async () => {
     const el = createElement({ slug: "telegram" });
     await waitRender();
     const shadow = el.shadowRoot!;
     expect(shadow).toBeTruthy();
-    // available state shows a connect button
+    const skeleton = shadow.querySelector(".vendo-card__skeleton--name");
+    expect(skeleton).toBeTruthy();
+    const skeletonBtn = shadow.querySelector(".vendo-card__skeleton--btn");
+    expect(skeletonBtn).toBeTruthy();
+  });
+
+  it("renders in available state when set directly", async () => {
+    const el = createElement({ slug: "telegram" });
+    await waitRender();
+    el._setState("available");
+    await waitRender();
+    const shadow = el.shadowRoot!;
     const btn = shadow.querySelector("button");
     expect(btn).toBeTruthy();
     expect(btn!.textContent).toContain("Connect");
@@ -135,13 +146,14 @@ describe("<vendo-connection-card>", () => {
       }),
     } as unknown as Response);
 
-    const el = createElement({ slug: "telegram", "api-key": "vendo_sk_test" });
+    const el = createElement({ slug: "telegram", name: "Telegram", "api-key": "vendo_sk_test" });
     await waitRender();
     await new Promise((r) => setTimeout(r, 10));
     await waitRender();
 
     const shadow = el.shadowRoot!;
-    expect(shadow.querySelector(".vendo-card__name")?.textContent).toContain("My Bot");
+    expect(shadow.querySelector(".vendo-card__name")?.textContent).toBe("Telegram");
+    expect(shadow.querySelector(".vendo-card__subtitle")?.textContent).toBe("My Bot");
     expect(shadow.querySelector(".vendo-card__status")?.textContent).toContain("Connected");
   });
 
@@ -166,12 +178,13 @@ describe("<vendo-connection-card>", () => {
       "logo-url": "https://example.com/telegram.png",
       "brand-color": "#0088cc",
     });
+    // Move past loading state so logo renders
+    el._setState("available");
     await waitRender();
     const shadow = el.shadowRoot!;
     const img = shadow.querySelector<HTMLImageElement>("img.vendo-card__logo");
     expect(img).toBeTruthy();
     expect(img!.getAttribute("src")).toBe("https://example.com/telegram.png");
-    // brand color drives a left-border accent on the card
     const card = shadow.querySelector<HTMLElement>(".vendo-card");
     expect(card!.getAttribute("style")).toContain("#0088cc");
   });
@@ -192,12 +205,11 @@ describe("<vendo-connection-card>", () => {
       "logo-url": "javascript:alert(1)",
       "brand-color": "red; background: url(x)",
     });
+    el._setState("available");
     await waitRender();
     const shadow = el.shadowRoot!;
-    // No <img> rendered for the unsafe URL — falls back to letter disc
     expect(shadow.querySelector("img.vendo-card__logo")).toBeNull();
     expect(shadow.querySelector(".vendo-card__logo--fallback")).toBeTruthy();
-    // Unsafe brand color is dropped — no inline style on the card
     const card = shadow.querySelector<HTMLElement>(".vendo-card");
     expect(card!.getAttribute("style")).toBeNull();
   });
@@ -229,6 +241,65 @@ describe("<vendo-connection-card>", () => {
     expect(img!.getAttribute("src")).toBe("https://example.com/api-telegram.png");
     const card = shadow.querySelector<HTMLElement>(".vendo-card");
     expect(card!.getAttribute("style")).toContain("#229ED9");
+  });
+
+  it("applies default (vendo) theme CSS variables", async () => {
+    const el = createElement({ slug: "telegram" });
+    el._setState("available");
+    await waitRender();
+    const shadow = el.shadowRoot!;
+    const style = shadow.querySelector("style");
+    expect(style!.textContent).toContain("--vendo-color-brand: #2B7A5E");
+  });
+
+  it("applies beige theme CSS variables", async () => {
+    const el = createElement({ slug: "telegram", theme: "beige" });
+    el._setState("available");
+    await waitRender();
+    const shadow = el.shadowRoot!;
+    const style = shadow.querySelector("style");
+    expect(style!.textContent).toContain("--vendo-color-surface: #FAF7F2");
+  });
+
+  it("applies dark theme CSS variables", async () => {
+    const el = createElement({ slug: "telegram", theme: "dark" });
+    el._setState("available");
+    await waitRender();
+    const shadow = el.shadowRoot!;
+    const style = shadow.querySelector("style");
+    expect(style!.textContent).toContain("--vendo-color-surface: #1C1B18");
+  });
+
+  it("shows integration name as title and display_name as subtitle", async () => {
+    const el = createElement({ slug: "openai", name: "OpenAI" });
+    el._setState("connected", { id: "conn-1", displayName: "OpenAI (Vendo managed)" });
+    await waitRender();
+    const shadow = el.shadowRoot!;
+    expect(shadow.querySelector(".vendo-card__name")?.textContent).toBe("OpenAI");
+    expect(shadow.querySelector(".vendo-card__subtitle")?.textContent).toBe("OpenAI (Vendo managed)");
+  });
+
+  it("hides subtitle when display_name matches integration name", async () => {
+    const el = createElement({ slug: "telegram", name: "Telegram" });
+    el._setState("connected", { id: "conn-1", displayName: "Telegram" });
+    await waitRender();
+    const shadow = el.shadowRoot!;
+    expect(shadow.querySelector(".vendo-card__name")?.textContent).toBe("Telegram");
+    expect(shadow.querySelector(".vendo-card__subtitle")).toBeNull();
+  });
+
+  it("resolves relative logo URLs against connect-origin", async () => {
+    const el = createElement({
+      slug: "openai",
+      "logo-url": "/integrations/openai.svg",
+      "connect-origin": "https://vendo.run",
+    });
+    el._setState("available");
+    await waitRender();
+    const shadow = el.shadowRoot!;
+    const img = shadow.querySelector<HTMLImageElement>("img.vendo-card__logo");
+    expect(img).toBeTruthy();
+    expect(img!.getAttribute("src")).toBe("https://vendo.run/integrations/openai.svg");
   });
 
   it("restarts fetch and SSE when slug attribute changes", async () => {

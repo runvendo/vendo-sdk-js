@@ -77,16 +77,46 @@ const ROUTES = {
   "/styles.css": { file: "examples/connection-card-demo/styles.css", type: "text/css; charset=utf-8" },
   "/dist/index.js": { file: "dist/index.js", type: "text/javascript; charset=utf-8" },
   "/dist/browser/index.js": { file: "dist/browser/index.js", type: "text/javascript; charset=utf-8" },
+  // Inline favicon (single-pixel transparent PNG) so the browser stops 404'ing.
+  "/favicon.ico": { inline: Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c63600000000200015c1c2cf4000000004945e4ae426082", "hex"), type: "image/png" },
 };
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (url.pathname.startsWith("/api/")) {
-    res.writeHead(502, { "content-type": "text/plain" });
-    res.end(
-      "This demo does not proxy /api/*. Run `bin/vendo dev --port 8787 --origin http://127.0.0.1:3210 ...` and open http://127.0.0.1:8787 instead.\n",
-    );
+    const target = `https://vendo.run${url.pathname}${url.search}`;
+    const headers = {
+      "content-type": req.headers["content-type"] || "application/json",
+      "authorization": `Bearer ${VENDO_API_KEY}`,
+    };
+    if (req.headers["vendo-api-version"]) {
+      headers["vendo-api-version"] = req.headers["vendo-api-version"];
+    }
+    try {
+      const upstream = await fetch(target, {
+        method: req.method,
+        headers,
+        body: req.method !== "GET" && req.method !== "HEAD"
+          ? await new Promise((resolve, reject) => {
+              const chunks = [];
+              req.on("data", (c) => chunks.push(c));
+              req.on("end", () => resolve(Buffer.concat(chunks)));
+              req.on("error", reject);
+            })
+          : undefined,
+      });
+      res.writeHead(upstream.status, {
+        "content-type": upstream.headers.get("content-type") || "application/json",
+        "access-control-allow-origin": "*",
+      });
+      const buf = Buffer.from(await upstream.arrayBuffer());
+      res.end(buf);
+    } catch (err) {
+      console.error(`[demo] proxy error: ${err.message}`);
+      res.writeHead(502, { "content-type": "text/plain" });
+      res.end(`Proxy error: ${err.message}\n`);
+    }
     return;
   }
 
@@ -98,6 +128,11 @@ const server = createServer(async (req, res) => {
   }
 
   try {
+    if (route.inline) {
+      res.writeHead(200, { "content-type": route.type, "cache-control": "public, max-age=86400" });
+      res.end(route.inline);
+      return;
+    }
     let body = await readFile(resolve(SDK_ROOT, route.file), "utf8");
     if (route.template) {
       body = body.replace(/\{\{VENDO_API_KEY\}\}/g, VENDO_API_KEY);

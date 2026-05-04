@@ -5,7 +5,7 @@
   --border: #e2e8f0;
   --muted: #64748b;
   --text: #0f172a;
-  --brand: #6c47ff;
+  --brand: #2B7A5E;
   --error: #dc2626;
   --code-bg: #0f172a;
   --code-fg: #e2e8f0;
@@ -216,6 +216,62 @@ details.json-panel pre {
 #probeOutput.error {
   color: #fca5a5;
 }
+
+/* Theme bar */
+.theme-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.theme-bar label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.theme-btn {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.3em 0.7em;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.theme-btn:hover { background: #f1f5f9; }
+.theme-btn.active {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+
+/* Dark mode for demo chrome */
+body.demo-dark {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --border: #334155;
+  --muted: #94a3b8;
+  --text: #f1f5f9;
+  --code-bg: #020617;
+  --code-fg: #e2e8f0;
+}
+body.demo-dark .theme-btn { background: var(--surface); color: var(--text); border-color: var(--border); }
+body.demo-dark .theme-btn:hover { background: #334155; }
+body.demo-dark .theme-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+body.demo-dark .probe-row select,
+body.demo-dark .probe-row button { background: var(--surface); color: var(--text); border-color: var(--border); }
+body.demo-dark .probe-row button:hover { background: #334155; }
+body.demo-dark .ref-card { background: var(--surface); border-color: var(--border); }
+body.demo-dark .ref-card__logo { background: #334155; }
+body.demo-dark .ref-card__btn { background: var(--surface); color: var(--text); border-color: var(--border); }
+body.demo-dark .ref-card__btn--primary { background: var(--brand); color: #fff; border-color: var(--brand); }
 
 .empty {
   padding: 1rem;
