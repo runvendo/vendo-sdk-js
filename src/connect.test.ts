@@ -4,7 +4,7 @@ import { connectUrl } from "./connect";
 describe("connectUrl", () => {
   it("generates the correct URL with apiKey", () => {
     const url = connectUrl("telegram", { apiKey: "k" });
-    expect(url).toBe("https://vendo.run/connect/telegram?app_key=k");
+    expect(url).toBe("https://vendo.run/connections/connect/telegram?app_key=k");
   });
 
   it("uses custom baseUrl", () => {
@@ -12,7 +12,7 @@ describe("connectUrl", () => {
       apiKey: "mykey",
       baseUrl: "https://staging.vendo.run",
     });
-    expect(url).toContain("https://staging.vendo.run/connect/telegram");
+    expect(url).toContain("https://staging.vendo.run/connections/connect/telegram");
   });
 
   it("strips trailing slash from baseUrl", () => {
@@ -20,7 +20,7 @@ describe("connectUrl", () => {
       apiKey: "k",
       baseUrl: "https://vendo.run/",
     });
-    expect(url).toContain("https://vendo.run/connect/telegram");
+    expect(url).toContain("https://vendo.run/connections/connect/telegram");
     expect(url).not.toContain("//connect");
   });
 
@@ -46,7 +46,7 @@ describe("connectUrl", () => {
 
   it("URL-encodes slug with special characters", () => {
     const url = connectUrl("my integration", { apiKey: "k" });
-    expect(url).toContain("/connect/my%20integration");
+    expect(url).toContain("/connections/connect/my%20integration");
   });
 
   it("omits returnTo and state when not provided", () => {

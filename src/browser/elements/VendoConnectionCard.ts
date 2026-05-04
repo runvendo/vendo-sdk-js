@@ -184,7 +184,7 @@ export class VendoConnectionCard extends HTMLElement {
     const params = new URLSearchParams();
     if (key) params.set("app_key", key);
     params.set("return_to", window.location.href);
-    return `${baseUrl}/connect/${slug}?${params.toString()}`;
+    return `${baseUrl}/connections/connect/${slug}?${params.toString()}`;
   }
 
   private async _handleConnect(): Promise<void> {
