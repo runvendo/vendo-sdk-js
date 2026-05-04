@@ -39,7 +39,11 @@ export class Vendo {
         { code: "app_unknown" },
       );
     }
-    this.baseUrl = opts.baseUrl || env.VENDO_BASE_URL || "https://vendo.run/api";
+    // Default has no `/api` suffix — every call site (integrations.ts,
+    // connections.ts, billing.ts, VendoConnectionCard) prefixes its path
+    // with `/api/`. A baseUrl of `https://vendo.run/api` would produce
+    // `https://vendo.run/api/api/<path>`.
+    this.baseUrl = opts.baseUrl || env.VENDO_BASE_URL || "https://vendo.run";
     this.apiVersion = opts.apiVersion ?? "2026-05-02";
     this._http = new HttpAdapter({
       apiKey: this.apiKey,

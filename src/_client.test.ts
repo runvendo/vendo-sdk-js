@@ -32,12 +32,32 @@ describe("Vendo", () => {
     expect(() => new Vendo({ fetch: noopFetch })).toThrow(AuthError);
   });
 
-  it("defaults baseUrl to https://vendo.run/api when env var is not set", () => {
+  it("defaults baseUrl to https://vendo.run (no /api suffix) when env var is not set", () => {
+    // Regression: the old default was "https://vendo.run/api". Combined with
+    // call-site paths that already start with "/api/" (integrations.ts,
+    // connections.ts, billing.ts, VendoConnectionCard.ts), the SDK hit
+    // "https://vendo.run/api/api/<path>" — every default-config call 404'd
+    // or CORS-failed. Hermes-webui only worked because it overrode baseUrl
+    // to "https://vendo.run" explicitly.
     vi.stubEnv("VENDO_API_KEY", "sk-test");
-    // Ensure VENDO_BASE_URL is not set
     vi.stubEnv("VENDO_BASE_URL", "");
     const v = new Vendo({ fetch: noopFetch });
-    expect(v.baseUrl).toBe("https://vendo.run/api");
+    expect(v.baseUrl).toBe("https://vendo.run");
+  });
+
+  it("default baseUrl + integrations.list() hits https://vendo.run/api/integrations (not /api/api/)", async () => {
+    vi.stubEnv("VENDO_API_KEY", "sk-test");
+    vi.stubEnv("VENDO_BASE_URL", "");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ integrations: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const v = new Vendo({ fetch: fetchMock as unknown as typeof fetch });
+    await v.integrations.list();
+    const calledUrl = fetchMock.mock.calls[0][0] as string | URL;
+    expect(String(calledUrl)).toBe("https://vendo.run/api/integrations");
   });
 
   it("forUser(jwt) returns a new Vendo instance with _userJwt set", () => {
