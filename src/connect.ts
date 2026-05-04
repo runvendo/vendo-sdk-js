@@ -12,5 +12,5 @@ export function connectUrl(slug: string, opts: ConnectUrlOptions): string {
   qs.set("app_key", opts.apiKey);
   if (opts.returnTo) qs.set("return_to", opts.returnTo);
   if (opts.state) qs.set("state", opts.state);
-  return `${base}/connect/${encodeURIComponent(slug)}?${qs.toString()}`;
+  return `${base}/connections/connect/${encodeURIComponent(slug)}?${qs.toString()}`;
 }

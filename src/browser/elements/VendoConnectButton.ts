@@ -79,7 +79,7 @@ export class VendoConnectButton extends HTMLElement {
     const params = new URLSearchParams();
     if (key) params.set("app_key", key);
     params.set("return_to", returnTo);
-    return `${baseUrl}/connect/${slug}?${params.toString()}`;
+    return `${baseUrl}/connections/connect/${slug}?${params.toString()}`;
   }
 
   private async _handleClick(): Promise<void> {
