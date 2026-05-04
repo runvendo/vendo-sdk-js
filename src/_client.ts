@@ -43,7 +43,14 @@ export class Vendo {
     // connections.ts, billing.ts, VendoConnectionCard) prefixes its path
     // with `/api/`. A baseUrl of `https://vendo.run/api` would produce
     // `https://vendo.run/api/api/<path>`.
-    this.baseUrl = opts.baseUrl || env.VENDO_BASE_URL || "https://vendo.run";
+    //
+    // `??` on opts.baseUrl so an explicit empty string survives — it's
+    // the same-origin / proxy-friendly posture used behind `vendo dev`
+    // and hermes-webui's /api/vendo/proxy. The env var, in contrast,
+    // is `||`-coalesced — an empty `VENDO_BASE_URL` env value is treated
+    // as unset, since shells commonly normalize unset to "".
+    const envBaseUrl = env.VENDO_BASE_URL || undefined;
+    this.baseUrl = opts.baseUrl ?? envBaseUrl ?? "https://vendo.run";
     this.apiVersion = opts.apiVersion ?? "2026-05-02";
     this._http = new HttpAdapter({
       apiKey: this.apiKey,

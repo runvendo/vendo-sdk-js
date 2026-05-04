@@ -45,6 +45,35 @@ describe("Vendo", () => {
     expect(v.baseUrl).toBe("https://vendo.run");
   });
 
+  it("respects explicit baseUrl: '' (same-origin) — does not fall through to default", () => {
+    // Empty-string baseUrl is the same-origin / proxy-friendly posture
+    // (e.g. behind `vendo dev` or hermes-webui's /api/vendo/proxy). The
+    // old `||` chain treated "" as falsy and substituted the default,
+    // forcing every request cross-origin and tripping CSP.
+    vi.stubEnv("VENDO_API_KEY", "sk-test");
+    vi.stubEnv("VENDO_BASE_URL", "https://should.be.ignored");
+    const v = new Vendo({ apiKey: "sk-test", baseUrl: "", fetch: noopFetch });
+    expect(v.baseUrl).toBe("");
+  });
+
+  it("explicit baseUrl: '' produces relative same-origin call URLs", async () => {
+    vi.stubEnv("VENDO_API_KEY", "sk-test");
+    vi.stubEnv("VENDO_BASE_URL", "");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ integrations: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const v = new Vendo({
+      apiKey: "sk-test",
+      baseUrl: "",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+    await v.integrations.list();
+    expect(String(fetchMock.mock.calls[0][0])).toBe("/api/integrations");
+  });
+
   it("default baseUrl + integrations.list() hits https://vendo.run/api/integrations (not /api/api/)", async () => {
     vi.stubEnv("VENDO_API_KEY", "sk-test");
     vi.stubEnv("VENDO_BASE_URL", "");
