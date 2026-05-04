@@ -1,0 +1,227 @@
+/* Demo-only styling. Never shipped in dist. */
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --muted: #64748b;
+  --text: #0f172a;
+  --brand: #6c47ff;
+  --error: #dc2626;
+  --code-bg: #0f172a;
+  --code-fg: #e2e8f0;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.demo-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+.demo-header h1 { margin: 0; font-size: 1.05rem; }
+.demo-header .meta {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.demo-header .key-pill {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.demo-header .key-pill.ok { color: #16a34a; }
+.demo-header .key-pill.missing { color: var(--error); }
+
+.demo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.column h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.column h2 .count {
+  font-size: 0.7rem;
+  background: var(--border);
+  color: var(--muted);
+  padding: 0.1em 0.5em;
+  border-radius: 999px;
+  margin-left: 0.4em;
+}
+
+.cards-stack { display: flex; flex-direction: column; gap: 0.5rem; }
+
+/* Reference column — hand-copied from web/src/components/connections/ConnectionsCatalog.tsx
+ * patterns. Tailwind-ish translated to vanilla CSS. Updated when the portal changes. */
+.ref-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.ref-card__logo {
+  width: 2.25rem; height: 2.25rem;
+  border-radius: 8px;
+  background: #f1f5f9;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--muted);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.ref-card__logo img { width: 100%; height: 100%; object-fit: contain; }
+.ref-card__main { flex: 1; min-width: 0; }
+.ref-card__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.ref-card__desc {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin-top: 0.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ref-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.ref-card__status .dot {
+  width: 0.5rem; height: 0.5rem; border-radius: 50%;
+  background: #94a3b8;
+}
+.ref-card__status .dot.active { background: #10b981; }
+.ref-card__btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.4em 0.9em;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ref-card__btn--primary {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: white;
+}
+
+/* JSON dump panels */
+details.json-panel {
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+details.json-panel summary {
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  user-select: none;
+}
+details.json-panel pre {
+  margin: 0;
+  padding: 0.9rem;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  overflow: auto;
+  max-height: 24rem;
+  white-space: pre;
+}
+
+/* Probe row — full-width below the grid */
+.probe {
+  margin: 0 1.5rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 1rem;
+}
+.probe h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.probe-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.probe-row select, .probe-row button {
+  font: inherit;
+  padding: 0.45em 0.9em;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.probe-row button:hover { background: #f1f5f9; }
+#probeOutput {
+  margin: 0;
+  padding: 0.9rem;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  border-radius: 6px;
+  overflow: auto;
+  max-height: 22rem;
+  white-space: pre;
+}
+#probeOutput.error {
+  color: #fca5a5;
+}
+
+.empty {
+  padding: 1rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vendo SDK · connection-card demo</title>
+    <!-- Server replaces {{VENDO_API_KEY}} on each request. The SDK reads this. -->
+    <meta name="vendo-api-key" content="{{VENDO_API_KEY}}" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="demo-header">
+      <h1>Vendo SDK · connection-card demo</h1>
+      <span class="meta" id="hostMeta"></span>
+      <span class="key-pill" id="keyPill">checking key…</span>
+    </header>
+
+    <section class="demo-grid">
+      <div class="column">
+        <h2>Live SDK <span class="count" id="sdkCount">…</span></h2>
+        <div class="cards-stack" id="sdkCards">
+          <div class="empty">Loading integrations…</div>
+        </div>
+
+        <details class="json-panel" id="integrationsPanel">
+          <summary>integrations.list() — raw response</summary>
+          <pre id="integrationsJson">…</pre>
+        </details>
+        <details class="json-panel" id="connectionsPanel">
+          <summary>connections.list() — raw response</summary>
+          <pre id="connectionsJson">…</pre>
+        </details>
+      </div>
+
+      <div class="column">
+        <h2>Reference (connect portal pattern)</h2>
+        <!-- Hand-copied static reference. Source of truth: web/src/components/connections/ConnectionsCatalog.tsx -->
+        <div class="cards-stack">
+          <div class="ref-card">
+            <span class="ref-card__logo">
+              <img src="https://logo.clearbit.com/telegram.org" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'T'}))" />
+            </span>
+            <div class="ref-card__main">
+              <div class="ref-card__title">
+                Telegram
+                <span class="ref-card__status"><span class="dot active"></span>Active</span>
+              </div>
+              <div class="ref-card__desc">Send and receive messages via the Telegram Bot API</div>
+            </div>
+            <button class="ref-card__btn">Manage</button>
+          </div>
+          <div class="ref-card">
+            <span class="ref-card__logo">
+              <img src="https://logo.clearbit.com/openai.com" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'O'}))" />
+            </span>
+            <div class="ref-card__main">
+              <div class="ref-card__title">
+                OpenAI
+                <span class="ref-card__status"><span class="dot"></span>Available</span>
+              </div>
+              <div class="ref-card__desc">GPT-4o, o1, o3, embeddings, and more via Vendo's managed pool</div>
+            </div>
+            <button class="ref-card__btn ref-card__btn--primary">Connect</button>
+          </div>
+          <div class="ref-card">
+            <span class="ref-card__logo">
+              <img src="https://logo.clearbit.com/notion.so" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'N'}))" />
+            </span>
+            <div class="ref-card__main">
+              <div class="ref-card__title">
+                Notion
+                <span class="ref-card__status"><span class="dot"></span>Available</span>
+              </div>
+              <div class="ref-card__desc">Read and write pages, databases, and blocks</div>
+            </div>
+            <button class="ref-card__btn ref-card__btn--primary">Connect</button>
+          </div>
+        </div>
+        <p class="empty" style="margin-top:1rem">
+          This column is a static reference. Visual delta between left and right is what we're trying to close.
+        </p>
+      </div>
+    </section>
+
+    <section class="probe">
+      <h2>Probe</h2>
+      <div class="probe-row">
+        <label for="probeSlug">slug</label>
+        <select id="probeSlug"><option value="">(load integrations first)</option></select>
+        <button data-probe="integrations.list">integrations.list()</button>
+        <button data-probe="connections.list">connections.list()</button>
+        <button data-probe="billing.balance">billing.balance()</button>
+        <button data-probe="connections.get">connections.get(slug)</button>
+      </div>
+      <pre id="probeOutput">click a button to probe</pre>
+    </section>
+
+    <script type="module">
+      // Mirrors hermes-webui's vendo-bootstrap.js: import Vendo from the main
+      // entry, then side-effect import /dist/browser/index.js which auto-
+      // registers <vendo-connection-card> and friends. Both come from the
+      // SDK's own dist/ via the demo server. Expects `npm run build` (or
+      // `npm run build -- --watch`) in the SDK repo root.
+      import { Vendo as VendoClass } from "/dist/index.js";
+      import "/dist/browser/index.js";
+
+      const apiKey = document.querySelector('meta[name="vendo-api-key"]')?.content?.trim() || "";
+      const keyPill = document.getElementById("keyPill");
+      if (apiKey) {
+        keyPill.classList.add("ok");
+        keyPill.textContent = `key: ${apiKey.slice(0, 12)}…`;
+      } else {
+        keyPill.classList.add("missing");
+        keyPill.textContent = "no VENDO_API_KEY — set via vendo dev --env --deployment <id>";
+      }
+
+      document.getElementById("hostMeta").textContent = `origin: ${location.origin}`;
+
+      // Empty baseUrl → all /api/* requests go same-origin (through `vendo dev`).
+      // bind fetch to globalThis — same workaround vendo-bootstrap.js uses for
+      // SDK 0.3.0's internal `this.fetch(...)` invocation pattern.
+      const Vendo = new VendoClass({
+        apiKey,
+        baseUrl: "",
+        fetch: globalThis.fetch.bind(globalThis),
+      });
+      window.Vendo = Vendo;
+
+      const cardsEl = document.getElementById("sdkCards");
+      const sdkCountEl = document.getElementById("sdkCount");
+      const integrationsJson = document.getElementById("integrationsJson");
+      const connectionsJson = document.getElementById("connectionsJson");
+      const probeSlug = document.getElementById("probeSlug");
+      const probeOutput = document.getElementById("probeOutput");
+
+      function showError(el, err) {
+        el.textContent = `ERROR: ${err && err.message ? err.message : String(err)}`;
+        el.style.color = "#fca5a5";
+      }
+
+      let integrations = [];
+      try {
+        integrations = await Vendo.integrations.list();
+        integrationsJson.textContent = JSON.stringify(integrations, null, 2);
+      } catch (err) {
+        showError(integrationsJson, err);
+      }
+
+      try {
+        const conns = await Vendo.connections.list();
+        connectionsJson.textContent = JSON.stringify(conns, null, 2);
+      } catch (err) {
+        showError(connectionsJson, err);
+      }
+
+      sdkCountEl.textContent = String(integrations.length);
+      cardsEl.innerHTML = "";
+      if (!integrations.length) {
+        cardsEl.innerHTML = `<div class="empty">No integrations returned. Check the JSON panel below.</div>`;
+      } else {
+        for (const it of integrations) {
+          const card = document.createElement("vendo-connection-card");
+          card.setAttribute("slug", it.slug);
+          card.setAttribute("base-url", "");
+          if (it.logoUrl) card.setAttribute("logo-url", it.logoUrl);
+          if (it.brandColor) card.setAttribute("brand-color", it.brandColor);
+          cardsEl.appendChild(card);
+          probeSlug.appendChild(new Option(it.slug, it.slug));
+        }
+      }
+
+      // Probe row
+      document.querySelectorAll("[data-probe]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const action = btn.dataset.probe;
+          probeOutput.classList.remove("error");
+          probeOutput.textContent = `→ ${action}…`;
+          try {
+            let result;
+            if (action === "integrations.list") result = await Vendo.integrations.list();
+            else if (action === "connections.list") result = await Vendo.connections.list();
+            else if (action === "billing.balance") result = await Vendo.billing.balance();
+            else if (action === "connections.get") {
+              const slug = probeSlug.value;
+              if (!slug) throw new Error("pick a slug first");
+              result = await Vendo.connections.get(slug);
+            }
+            probeOutput.textContent = JSON.stringify(result, null, 2);
+          } catch (err) {
+            probeOutput.classList.add("error");
+            probeOutput.textContent = `ERROR: ${err && err.message ? err.message : String(err)}`;
+          }
+        });
+      });
+
+      // Surface SDK connection events for visibility while debugging the
+      // "card doesn't update post-connect" bug.
+      window.addEventListener("vendo-connected", (e) => console.log("[demo] vendo-connected", e.detail));
+      window.addEventListener("vendo-disconnected", (e) => console.log("[demo] vendo-disconnected", e.detail));
+    </script>
+  </body>
+</html>
