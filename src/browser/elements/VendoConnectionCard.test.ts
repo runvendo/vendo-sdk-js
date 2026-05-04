@@ -160,6 +160,77 @@ describe("<vendo-connection-card>", () => {
     expect(shadow.innerHTML).toContain('&lt;script&gt;');
   });
 
+  it("renders logo image when logo-url attribute is set", async () => {
+    const el = createElement({
+      slug: "telegram",
+      "logo-url": "https://example.com/telegram.png",
+      "brand-color": "#0088cc",
+    });
+    await waitRender();
+    const shadow = el.shadowRoot!;
+    const img = shadow.querySelector<HTMLImageElement>("img.vendo-card__logo");
+    expect(img).toBeTruthy();
+    expect(img!.getAttribute("src")).toBe("https://example.com/telegram.png");
+    // brand color drives a left-border accent on the card
+    const card = shadow.querySelector<HTMLElement>(".vendo-card");
+    expect(card!.getAttribute("style")).toContain("#0088cc");
+  });
+
+  it("renders fallback letter disc when logo-url is empty", async () => {
+    const el = createElement({ slug: "telegram" });
+    el._setState("available", { id: "x", displayName: "Telegram" });
+    await waitRender();
+    const shadow = el.shadowRoot!;
+    const fallback = shadow.querySelector(".vendo-card__logo--fallback");
+    expect(fallback).toBeTruthy();
+    expect(fallback!.textContent).toBe("T");
+  });
+
+  it("rejects javascript: logo-url and unsafe brand-color values", async () => {
+    const el = createElement({
+      slug: "telegram",
+      "logo-url": "javascript:alert(1)",
+      "brand-color": "red; background: url(x)",
+    });
+    await waitRender();
+    const shadow = el.shadowRoot!;
+    // No <img> rendered for the unsafe URL — falls back to letter disc
+    expect(shadow.querySelector("img.vendo-card__logo")).toBeNull();
+    expect(shadow.querySelector(".vendo-card__logo--fallback")).toBeTruthy();
+    // Unsafe brand color is dropped — no inline style on the card
+    const card = shadow.querySelector<HTMLElement>(".vendo-card");
+    expect(card!.getAttribute("style")).toBeNull();
+  });
+
+  it("picks up logo_url and brand_color from /connections response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        connections: [
+          {
+            slug: "telegram",
+            status: "connected",
+            id: "uuid-real",
+            display_name: "My Bot",
+            logo_url: "https://example.com/api-telegram.png",
+            brand_color: "#229ED9",
+          },
+        ],
+      }),
+    } as unknown as Response);
+
+    const el = createElement({ slug: "telegram", "api-key": "vendo_sk_test" });
+    await waitRender();
+    await new Promise((r) => setTimeout(r, 10));
+    await waitRender();
+
+    const shadow = el.shadowRoot!;
+    const img = shadow.querySelector<HTMLImageElement>("img.vendo-card__logo");
+    expect(img!.getAttribute("src")).toBe("https://example.com/api-telegram.png");
+    const card = shadow.querySelector<HTMLElement>(".vendo-card");
+    expect(card!.getAttribute("style")).toContain("#229ED9");
+  });
+
   it("restarts fetch and SSE when slug attribute changes", async () => {
     const openSseSpy = vi.spyOn(sseModule, "openSseStream").mockReturnValue(() => {});
     vi.spyOn(globalThis, "fetch").mockResolvedValue({

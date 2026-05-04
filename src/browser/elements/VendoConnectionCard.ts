@@ -21,6 +21,8 @@ interface RawConn {
   id: string;
   display_name?: string;
   error_message?: string;
+  logo_url?: string;
+  brand_color?: string;
 }
 
 /** Escape HTML special characters to prevent XSS when interpolating server-controlled
@@ -54,11 +56,21 @@ function escapeHtml(s: string): string {
  *   --vendo-color-error, --vendo-radius
  */
 export class VendoConnectionCard extends HTMLElement {
-  static observedAttributes = ["slug", "api-key", "base-url", "manage-base-url", "compact"];
+  static observedAttributes = [
+    "slug",
+    "api-key",
+    "base-url",
+    "manage-base-url",
+    "compact",
+    "logo-url",
+    "brand-color",
+  ];
 
   private _status: CardStatus = "available";
   private _connection: ConnectionInfo | null = null;
   private _displayName = "";
+  private _logoUrl = "";
+  private _brandColor = "";
   private _sseCleanup: SseCleanup | null = null;
   private _shadow: ShadowRoot | null = null;
   /** Cancel function for any in-flight popup; called in disconnectedCallback to prevent leaks. */
@@ -67,6 +79,8 @@ export class VendoConnectionCard extends HTMLElement {
   connectedCallback(): void {
     if (!this.shadowRoot) {
       this._shadow = this.attachShadow({ mode: "open" });
+      this._logoUrl = this.getAttribute("logo-url") ?? "";
+      this._brandColor = this.getAttribute("brand-color") ?? "";
       this._render();
     }
     const slug = this.getAttribute("slug");
@@ -100,6 +114,8 @@ export class VendoConnectionCard extends HTMLElement {
         this._openSse();
       }
     }
+    if (name === "logo-url") this._logoUrl = newValue ?? "";
+    if (name === "brand-color") this._brandColor = newValue ?? "";
     this._render();
   }
 
@@ -137,6 +153,9 @@ export class VendoConnectionCard extends HTMLElement {
         };
         this._status = (conn.status as CardStatus) ?? "available";
         this._displayName = conn.display_name ?? slug;
+        // Prefer server-supplied branding when present; fall back to attribute-set values
+        if (conn.logo_url) this._logoUrl = conn.logo_url;
+        if (conn.brand_color) this._brandColor = conn.brand_color;
       }
       this._render();
     } catch {
@@ -294,9 +313,19 @@ export class VendoConnectionCard extends HTMLElement {
     const shadow = this._shadow ?? this.shadowRoot;
     if (!shadow) return;
 
+    const slug = this.getAttribute("slug") ?? "";
     // displayName is server-supplied — escape to prevent XSS via stored display_name values
-    const displayName = escapeHtml(this._displayName || (this.getAttribute("slug") ?? ""));
+    const displayName = escapeHtml(this._displayName || slug);
     const compact = this.hasAttribute("compact");
+    // Only allow http(s) logo URLs to prevent javascript: / data: URI smuggling
+    const safeLogoUrl = /^https?:\/\//i.test(this._logoUrl) ? this._logoUrl : "";
+    // Brand color must look like #rgb / #rrggbb — never let arbitrary strings into a style attr
+    const safeBrandColor = /^#[0-9a-fA-F]{3,8}$/.test(this._brandColor) ? this._brandColor : "";
+    const logoSize = compact ? "1.5rem" : "2rem";
+    const logoHtml = safeLogoUrl
+      ? `<img class="vendo-card__logo" src="${escapeHtml(safeLogoUrl)}" alt="" aria-hidden="true" />`
+      : `<div class="vendo-card__logo vendo-card__logo--fallback" aria-hidden="true">${escapeHtml((displayName.charAt(0) || "?").toUpperCase())}</div>`;
+    const accentStyle = safeBrandColor ? ` style="border-left-color: ${safeBrandColor};"` : "";
 
     shadow.innerHTML = `
       <style>
@@ -305,8 +334,20 @@ export class VendoConnectionCard extends HTMLElement {
           display: flex; align-items: center; gap: 0.75rem;
           padding: ${compact ? "0.5rem 0.75rem" : "1rem"};
           border: 1px solid var(--vendo-color-border, #e2e8f0);
+          border-left: 3px solid var(--vendo-color-border, #e2e8f0);
           border-radius: var(--vendo-radius, 8px);
           background: var(--vendo-color-surface, #fff);
+        }
+        .vendo-card__logo {
+          width: ${logoSize}; height: ${logoSize};
+          flex-shrink: 0; border-radius: 6px; object-fit: contain;
+          background: var(--vendo-color-surface, #fff);
+        }
+        .vendo-card__logo--fallback {
+          display: inline-flex; align-items: center; justify-content: center;
+          background: var(--vendo-color-border, #e2e8f0);
+          color: var(--vendo-color-muted, #64748b);
+          font-weight: 700; font-size: 0.85rem;
         }
         .vendo-card__info { flex: 1; min-width: 0; }
         .vendo-card__name { font-weight: 600; font-size: 0.9rem; }
@@ -334,7 +375,8 @@ export class VendoConnectionCard extends HTMLElement {
         }
         @keyframes spin { to { transform: rotate(360deg); } }
       </style>
-      <div class="vendo-card">
+      <div class="vendo-card"${accentStyle}>
+        ${logoHtml}
         <div class="vendo-card__info">
           <div class="vendo-card__name">${displayName}</div>
           ${this._renderStatus()}
