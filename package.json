@@ -1,6 +1,6 @@
 {
   "name": "@vendodev/sdk",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Vendo TypeScript SDK — runtime contract for apps deployed via Vendo",
   "license": "MIT",
   "type": "module",
