@@ -59,7 +59,7 @@ describe("Vendo.token BYOK resolution", () => {
     const v = new Vendo({ fetch: fetchSpy as unknown as typeof fetch });
     expect(await v.token("openai")).toBe("from-vendo");
     expect(fetchSpy).toHaveBeenCalledOnce();
-    const url = fetchSpy.mock.calls[0][0] as string;
+    const url = (fetchSpy.mock.calls[0] as unknown[])[0] as string;
     expect(url).toContain("/openai");
   });
 
@@ -135,7 +135,7 @@ describe("Vendo.tokens BYOK resolution", () => {
     expect(result).toEqual({ openai: "override-openai", telegram: "tele-vendo" });
     // Only telegram should hit /_bulk; openai bypasses.
     expect(fetchSpy).toHaveBeenCalledOnce();
-    const url = fetchSpy.mock.calls[0][0] as string;
+    const url = (fetchSpy.mock.calls[0] as unknown[])[0] as string;
     expect(url).toContain("slugs=telegram");
     expect(url).not.toContain("openai");
   });

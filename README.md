@@ -35,6 +35,57 @@ const vendo = new Vendo({
 const userVendo = vendo.forUser(userJwt);
 ```
 
+## OSS mode (BYOK)
+
+`@vendodev/sdk` works without a Vendo backend. Set the conventional env var for each integration and the SDK reads it directly:
+
+```bash
+# .env (no VENDO_API_KEY)
+OPENAI_API_KEY=sk-...
+TELEGRAM_BOT_TOKEN=12345:abcde
+```
+
+```ts
+import { Vendo } from "@vendodev/sdk";
+const vendo = new Vendo();
+const tok = await vendo.token("openai");          // returns OPENAI_API_KEY value
+const bot = await vendo.token("telegram");        // returns TELEGRAM_BOT_TOKEN value
+```
+
+Resolution order for `vendo.token(slug)`:
+1. `VENDO_TOKEN_<UPPER_SLUG>` env var (escape hatch, always wins).
+2. If `VENDO_API_KEY` is set, fetch a refreshed token from Vendo's credentials worker.
+3. Else, read the slug's conventional env var (e.g. `openai` -> `OPENAI_API_KEY`).
+4. Else, throw `NotConnected` with a hint about which env var to set.
+
+Discover the env vars an integration accepts:
+
+```ts
+vendo.integrations.envVars("slack");  // ["SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"]
+import { isVendoMode } from "@vendodev/sdk";
+isVendoMode();                        // false when VENDO_API_KEY is unset
+```
+
+OAuth integrations (Gmail, Notion, Slack) work in OSS mode too, but the SDK passes the static token through as-is. It will not refresh expired OAuth tokens. Use `VENDO_API_KEY` if you need automatic refresh.
+
+Surfaces that genuinely require a Vendo backend (`billing`, `connectUrl`, `forRequest`) throw `VendoOnlyFeature` in OSS mode with a hint to set `VENDO_API_KEY`.
+
+## Multi-tenant (SaaS)
+
+Inside a request handler, scope a Vendo client to the logged-in user with one call:
+
+```ts
+import { Vendo } from "@vendodev/sdk";
+
+app.get("/api/calendar", async (req, res) => {
+  const client = new Vendo().forRequest(req.headers);
+  const tok = await client.token("google");
+  // ...
+});
+```
+
+`forRequest` reads `X-Vendo-User-JWT` (case-insensitive) from any Headers-like mapping. Throws `IdentityNotPresent` if the header is missing, `VendoOnlyFeature` if `VENDO_API_KEY` is unset.
+
 ## Connect flows
 
 ```ts
