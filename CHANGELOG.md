@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.2 — 2026-05-08
+
+### Added
+- `EventsAPI`: server-side SSE consumer for the Vendo events stream. `vendo.events.subscribe(opts?)` returns an async iterable yielding typed `EventStreamMessage` objects (`type`, `data`, `id?`, `retry?`). Auto-reconnects on transient errors with exponential backoff (capped at 30s, configurable via `maxBackoffMs`). Pass `signal: AbortSignal` to stop the iteration. Throws `VendoOnlyFeature` synchronously in OSS mode.
+- `Vendo.events` instance property exposing the same.
+
 ## v0.5.1 — 2026-05-08
 
 ### Added

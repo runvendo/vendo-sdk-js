@@ -4,6 +4,7 @@ import { ConnectionsAPI } from "./connections";
 import { IntegrationsAPI } from "./integrations";
 import { BillingAPI } from "./billing";
 import { WebhooksAPI } from "./webhooks";
+import { EventsAPI } from "./events";
 import { connectUrl, type ConnectUrlOptions } from "./connect";
 import { requireVendoMode } from "./_mode";
 
@@ -27,6 +28,7 @@ export class Vendo {
   readonly integrations: IntegrationsAPI;
   readonly billing: BillingAPI;
   readonly webhooks: WebhooksAPI;
+  readonly events: EventsAPI;
 
   private _tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
@@ -68,6 +70,7 @@ export class Vendo {
     this.integrations = new IntegrationsAPI(this._http);
     this.billing = new BillingAPI(this._http);
     this.webhooks = new WebhooksAPI();
+    this.events = new EventsAPI(this._http);
   }
 
   forUser(userJwt: string): Vendo {
@@ -93,6 +96,7 @@ export class Vendo {
     (child as { integrations: IntegrationsAPI }).integrations = new IntegrationsAPI(child._http);
     (child as { billing: BillingAPI }).billing = new BillingAPI(child._http);
     (child as { webhooks: WebhooksAPI }).webhooks = new WebhooksAPI();
+    (child as { events: EventsAPI }).events = new EventsAPI(child._http);
     return child;
   }
 
