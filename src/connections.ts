@@ -8,6 +8,16 @@ export type ConnectionStatus =
   | "error"
   | "revoked";
 
+export interface EnvBootstrapVar {
+  name: string;
+  valueFrom: string;
+}
+
+export interface EnvBootstrap {
+  vars: EnvBootstrapVar[];
+  restart: "gateway" | "none";
+}
+
 export interface Connection {
   id: string;
   externalId: string;
@@ -24,6 +34,7 @@ export interface Connection {
   logoUrl: string;
   brandColor: string;
   docsUrl: string;
+  envBootstrap: EnvBootstrap | null;
 }
 
 interface RawConnection {
@@ -42,9 +53,24 @@ interface RawConnection {
   logo_url?: string;
   brand_color?: string;
   docs_url?: string;
+  env_bootstrap?: {
+    vars?: Array<{ name: string; value_from: string }>;
+    restart?: "gateway" | "none";
+  } | null;
 }
 
 function fromRaw(raw: RawConnection): Connection {
+  const eb = raw.env_bootstrap;
+  const envBootstrap: EnvBootstrap | null =
+    eb && Array.isArray(eb.vars)
+      ? {
+          vars: eb.vars.map((v) => ({ name: v.name, valueFrom: v.value_from })),
+          restart:
+            eb.restart === "gateway" || eb.restart === "none"
+              ? eb.restart
+              : "none",
+        }
+      : null;
   return {
     id: raw.id,
     externalId: raw.external_id,
@@ -61,6 +87,7 @@ function fromRaw(raw: RawConnection): Connection {
     logoUrl: raw.logo_url ?? "",
     brandColor: raw.brand_color ?? "",
     docsUrl: raw.docs_url ?? "",
+    envBootstrap,
   };
 }
 
