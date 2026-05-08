@@ -118,6 +118,7 @@ describe("Vendo subAPIs and methods", () => {
   });
 
   it("token() caches and returns access_token from credentials.vendo.run", async () => {
+    vi.stubEnv("VENDO_API_KEY", "vendo_sk_x");
     const fetchMock = vi.fn().mockResolvedValueOnce({
       ok: true, status: 200,
       headers: new Headers(),
@@ -130,6 +131,7 @@ describe("Vendo subAPIs and methods", () => {
   });
 
   it("tokens() returns map and warms cache for non-null entries", async () => {
+    vi.stubEnv("VENDO_API_KEY", "vendo_sk_x");
     const fetchMock = vi.fn().mockResolvedValueOnce({
       ok: true, status: 200,
       headers: new Headers(),
@@ -155,6 +157,7 @@ describe("Vendo subAPIs and methods", () => {
   });
 
   it("invalidate() drops the cached token", async () => {
+    vi.stubEnv("VENDO_API_KEY", "vendo_sk_x");
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
         ok: true, status: 200, headers: new Headers(),

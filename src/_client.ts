@@ -1,5 +1,5 @@
 import { HttpAdapter, type RetryPolicy } from "./_http";
-import { AuthError, fromResponse } from "./errors";
+import { AuthError, NotConnected, fromResponse } from "./errors";
 import { ConnectionsAPI } from "./connections";
 import { IntegrationsAPI } from "./integrations";
 import { BillingAPI } from "./billing";
@@ -89,46 +89,105 @@ export class Vendo {
   }
 
   async token(slug: string): Promise<string> {
-    const hit = this._tokenCache.get(slug);
-    if (hit && hit.expiresAt > Date.now() + 60_000) return hit.token;
-    const url = `${this._credentialsBase().replace(/\/$/, "")}/${encodeURIComponent(slug)}`;
-    const res = await this._http.fetch(url, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${this.apiKey}` },
-    });
-    if (!res.ok) {
-      let body: unknown = {};
-      try { body = await res.json(); } catch {}
-      throw fromResponse({ status: res.status, headers: res.headers, body });
+    const env = (typeof process !== "undefined" ? process.env : {}) as Record<string, string | undefined>;
+
+    // Step 1: VENDO_TOKEN_<UPPER_SLUG> override wins in any mode.
+    const overrideKey = "VENDO_TOKEN_" + slug.toUpperCase().replace(/-/g, "_");
+    const override = (env[overrideKey] ?? "").trim();
+    if (override) return override;
+
+    // Step 2: Vendo mode — existing cache + fetch path.
+    if ((env.VENDO_API_KEY ?? "").trim()) {
+      const hit = this._tokenCache.get(slug);
+      if (hit && hit.expiresAt > Date.now() + 60_000) return hit.token;
+      const url = `${this._credentialsBase().replace(/\/$/, "")}/${encodeURIComponent(slug)}`;
+      const res = await this._http.fetch(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+      });
+      if (!res.ok) {
+        let body: unknown = {};
+        try { body = await res.json(); } catch { /* ignore */ }
+        throw fromResponse({ status: res.status, headers: res.headers, body });
+      }
+      const data = await res.json() as { access_token: string; expires_at: string | null };
+      const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : Date.now() + 50 * 60_000;
+      this._tokenCache.set(slug, { token: data.access_token, expiresAt });
+      return data.access_token;
     }
-    const data = await res.json() as { access_token: string; expires_at: string | null };
-    const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : Date.now() + 50 * 60_000;
-    this._tokenCache.set(slug, { token: data.access_token, expiresAt });
-    return data.access_token;
+
+    // Step 3 & 4: BYOK mode — read primary env var from bundled catalog.
+    const { primaryEnvVar } = await import("./_byok");
+    const envName = primaryEnvVar(slug);
+    if (envName === null) {
+      throw new NotConnected(
+        `slug '${slug}' is not in the bundled byok catalog. ` +
+        `If this is a custom integration, set ${overrideKey} to bypass; ` +
+        `otherwise set VENDO_API_KEY to use Vendo mode.`,
+        { code: "binding_missing", slug },
+      );
+    }
+    const val = (env[envName] ?? "").trim();
+    if (!val) {
+      throw new NotConnected(
+        `slug '${slug}' has no static token: set ${envName} (BYOK mode) ` +
+        `or VENDO_API_KEY (Vendo mode).`,
+        { code: "binding_missing", slug },
+      );
+    }
+    return val;
   }
 
   async tokens(slugs: string[]): Promise<Record<string, string | null>> {
-    const url = `${this._credentialsBase().replace(/\/$/, "")}/_bulk?slugs=${slugs.map(encodeURIComponent).join(",")}`;
-    const res = await this._http.fetch(url, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${this.apiKey}` },
-    });
-    if (!res.ok) {
-      let body: unknown = {};
-      try { body = await res.json(); } catch {}
-      throw fromResponse({ status: res.status, headers: res.headers, body });
-    }
-    const body = await res.json() as { tokens: Record<string, { access_token: string; expires_at: string | null } | null> };
+    const env = (typeof process !== "undefined" ? process.env : {}) as Record<string, string | undefined>;
     const out: Record<string, string | null> = {};
+
+    // Step 1: Per-slug VENDO_TOKEN_<SLUG> overrides win in any mode.
+    const pending: string[] = [];
     for (const slug of slugs) {
-      const entry = body.tokens?.[slug] ?? null;
-      if (entry === null) {
-        out[slug] = null;
-      } else {
-        const expiresAt = entry.expires_at ? new Date(entry.expires_at).getTime() : Date.now() + 50 * 60_000;
-        this._tokenCache.set(slug, { token: entry.access_token, expiresAt });
-        out[slug] = entry.access_token;
+      const overrideKey = "VENDO_TOKEN_" + slug.toUpperCase().replace(/-/g, "_");
+      const v = (env[overrideKey] ?? "").trim();
+      if (v) out[slug] = v;
+      else pending.push(slug);
+    }
+    if (pending.length === 0) return out;
+
+    // Step 2: Vendo mode — one bulk fetch for all pending slugs.
+    if ((env.VENDO_API_KEY ?? "").trim()) {
+      const url = `${this._credentialsBase().replace(/\/$/, "")}/_bulk?slugs=${pending.map(encodeURIComponent).join(",")}`;
+      const res = await this._http.fetch(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+      });
+      if (!res.ok) {
+        let body: unknown = {};
+        try { body = await res.json(); } catch { /* ignore */ }
+        throw fromResponse({ status: res.status, headers: res.headers, body });
       }
+      const body = await res.json() as { tokens: Record<string, { access_token: string; expires_at: string | null } | null> };
+      for (const slug of pending) {
+        const entry = body.tokens?.[slug] ?? null;
+        if (entry === null) {
+          out[slug] = null;
+        } else {
+          const expiresAt = entry.expires_at ? new Date(entry.expires_at).getTime() : Date.now() + 50 * 60_000;
+          this._tokenCache.set(slug, { token: entry.access_token, expiresAt });
+          out[slug] = entry.access_token;
+        }
+      }
+      return out;
+    }
+
+    // Step 3: BYOK mode — read each pending slug's primary env var.
+    const { primaryEnvVar } = await import("./_byok");
+    for (const slug of pending) {
+      const envName = primaryEnvVar(slug);
+      if (envName === null) {
+        out[slug] = null;
+        continue;
+      }
+      const v = (env[envName] ?? "").trim();
+      out[slug] = v || null;
     }
     return out;
   }
