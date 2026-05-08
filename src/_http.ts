@@ -22,6 +22,7 @@ export interface HttpAdapterOptions {
   timeoutMs?: number;
   fetch?: typeof fetch;
   userAgent?: string;
+  userJwt?: string;
 }
 
 export interface RequestOptions {
@@ -42,6 +43,7 @@ export class HttpAdapter {
   timeoutMs: number;
   fetch: typeof fetch;
   userAgent: string;
+  userJwt?: string;
 
   constructor(opts: HttpAdapterOptions) {
     this.apiKey = opts.apiKey;
@@ -50,6 +52,7 @@ export class HttpAdapter {
     this.apiVersion = opts.apiVersion ?? API_VERSION;
     this.timeoutMs = opts.timeoutMs ?? 30_000;
     this.userAgent = opts.userAgent ?? USER_AGENT;
+    this.userJwt = opts.userJwt;
     const f = opts.fetch ?? (globalThis as { fetch?: typeof fetch }).fetch;
     if (!f) throw new VendoError("fetch is not available", { code: "internal_error" });
     this.fetch = f;
@@ -97,8 +100,9 @@ export class HttpAdapter {
       Accept: "application/json",
       Authorization: `Bearer ${this.apiKey}`,
       "Vendo-API-Version": this.apiVersion,
-      ...(opts.extraHeaders ?? {}),
     };
+    if (this.userJwt) headers["X-Vendo-User-JWT"] = this.userJwt;
+    Object.assign(headers, opts.extraHeaders ?? {});
     if (opts.body !== undefined && opts.body !== null) {
       headers["Content-Type"] = "application/json";
     }

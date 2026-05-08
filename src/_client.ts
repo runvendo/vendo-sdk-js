@@ -1,9 +1,10 @@
 import { HttpAdapter, type RetryPolicy } from "./_http";
-import { AuthError, NotConnected, fromResponse } from "./errors";
+import { AuthError, IdentityNotPresent, NotConnected, fromResponse } from "./errors";
 import { ConnectionsAPI } from "./connections";
 import { IntegrationsAPI } from "./integrations";
 import { BillingAPI } from "./billing";
 import { connectUrl, type ConnectUrlOptions } from "./connect";
+import { requireVendoMode } from "./_mode";
 
 export interface VendoOptions {
   apiKey?: string;
@@ -67,18 +68,45 @@ export class Vendo {
   }
 
   forUser(userJwt: string): Vendo {
-    const v = new Vendo({
+    const child = new Vendo({
       apiKey: this.apiKey,
       baseUrl: this.baseUrl,
       apiVersion: this.apiVersion,
       timeoutMs: this._http.timeoutMs,
       fetch: this._http.fetch,
     });
-    v._userJwt = userJwt;
-    return v;
+    child._userJwt = userJwt;
+    // Rebuild the HTTP adapter and sub-APIs so they carry the JWT.
+    (child as { _http: HttpAdapter })._http = new HttpAdapter({
+      apiKey: this.apiKey,
+      baseUrl: this.baseUrl,
+      retry: this._http.retry,
+      apiVersion: this.apiVersion,
+      timeoutMs: this._http.timeoutMs,
+      fetch: this._http.fetch,
+      userJwt,
+    });
+    (child as { connections: ConnectionsAPI }).connections = new ConnectionsAPI(child._http);
+    (child as { integrations: IntegrationsAPI }).integrations = new IntegrationsAPI(child._http);
+    (child as { billing: BillingAPI }).billing = new BillingAPI(child._http);
+    return child;
+  }
+
+  forRequest(headers: Headers | Record<string, string>): Vendo {
+    requireVendoMode("forRequest");
+    const jwt = readHeaderCaseInsensitive(headers, "X-Vendo-User-JWT");
+    if (!jwt) {
+      throw new IdentityNotPresent(
+        "X-Vendo-User-JWT header missing. The Vendo proxy injects this header " +
+        "when forwarding authenticated requests; ensure your app runs behind " +
+        "the Vendo proxy with vendoAuth on.",
+      );
+    }
+    return this.forUser(jwt);
   }
 
   connectUrl(slug: string, opts?: Omit<ConnectUrlOptions, "apiKey" | "baseUrl">): string {
+    requireVendoMode("connectUrl");
     const root = this.baseUrl.replace(/\/api$/, "");
     return connectUrl(slug, { apiKey: this.apiKey, baseUrl: root, ...(opts ?? {}) });
   }
@@ -195,4 +223,21 @@ export class Vendo {
   invalidate(slug: string): void {
     this._tokenCache.delete(slug);
   }
+}
+
+function readHeaderCaseInsensitive(
+  headers: Headers | Record<string, string>,
+  name: string,
+): string | null {
+  if (typeof Headers !== "undefined" && headers instanceof Headers) {
+    const v = headers.get(name);
+    return v && v.trim() ? v.trim() : null;
+  }
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() === name.toLowerCase()) {
+      const s = String(v).trim();
+      return s || null;
+    }
+  }
+  return null;
 }

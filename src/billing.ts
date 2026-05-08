@@ -1,4 +1,5 @@
 import type { HttpAdapter } from "./_http";
+import { requireVendoMode } from "./_mode";
 
 export interface Balance {
   creditsRemainingMicros: number;
@@ -17,6 +18,7 @@ export class BillingAPI {
   constructor(private http: HttpAdapter) {}
 
   async balance(): Promise<Balance> {
+    requireVendoMode("billing.balance");
     const r = await this.http.get<{
       credits_remaining_micros?: number;
       currency?: string;
@@ -30,6 +32,7 @@ export class BillingAPI {
   }
 
   async spendCaps(): Promise<SpendCaps> {
+    requireVendoMode("billing.spendCaps");
     const r = await this.http.get<{
       daily_micros?: number | null;
       monthly_micros?: number | null;
@@ -45,6 +48,7 @@ export class BillingAPI {
   }
 
   async usage(opts: { period?: "day" | "month" } = {}): Promise<unknown> {
+    requireVendoMode("billing.usage");
     const period = opts.period ?? "month";
     return this.http.get(`/api/billing/usage?period=${period}`);
   }

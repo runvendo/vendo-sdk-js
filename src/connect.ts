@@ -1,3 +1,5 @@
+import { requireVendoMode } from "./_mode";
+
 export interface ConnectUrlOptions {
   apiKey: string;
   /** Root host, e.g. https://vendo.run (NOT /api suffix). */
@@ -7,6 +9,7 @@ export interface ConnectUrlOptions {
 }
 
 export function connectUrl(slug: string, opts: ConnectUrlOptions): string {
+  requireVendoMode("connectUrl");
   const base = (opts.baseUrl ?? "https://vendo.run").replace(/\/$/, "");
   const qs = new URLSearchParams();
   qs.set("app_key", opts.apiKey);

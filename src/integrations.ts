@@ -1,5 +1,6 @@
 import type { HttpAdapter } from "./_http";
 import { VendoError } from "./errors";
+import { allEnvVars } from "./_byok";
 
 export interface Integration {
   slug: string;
@@ -63,5 +64,9 @@ export class IntegrationsAPI {
       if (e instanceof VendoError && e.status === 404) return null;
       throw e;
     }
+  }
+
+  envVars(slug: string): string[] {
+    return allEnvVars(slug);
   }
 }

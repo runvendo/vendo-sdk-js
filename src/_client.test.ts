@@ -112,6 +112,7 @@ describe("Vendo subAPIs and methods", () => {
   });
 
   it("connectUrl uses the host root (strips /api suffix from baseUrl)", () => {
+    vi.stubEnv("VENDO_API_KEY", "vendo_sk_x");
     const v = new Vendo({ apiKey: "vendo_sk_x", baseUrl: "https://x.run/api", fetch: noopFetch });
     const url = v.connectUrl("telegram", { returnTo: "https://app.example.com/back" });
     expect(url).toBe("https://x.run/connections/connect/telegram?app_key=vendo_sk_x&return_to=https%3A%2F%2Fapp.example.com%2Fback");

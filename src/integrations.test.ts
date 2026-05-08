@@ -89,3 +89,21 @@ describe("IntegrationsAPI", () => {
     await expect(api.get("telegram")).rejects.toThrow(VendoError);
   });
 });
+
+describe("IntegrationsAPI.envVars", () => {
+  it("returns list for known slug, never calls network", () => {
+    const fakeHttp = { get: vi.fn(() => { throw new Error("envVars must NOT call network"); }) };
+    const api = new IntegrationsAPI(fakeHttp as never);
+    expect(api.envVars("openai")).toEqual(["OPENAI_API_KEY"]);
+    const slack = api.envVars("slack");
+    expect(slack).toContain("SLACK_BOT_TOKEN");
+    expect(slack).toContain("SLACK_SIGNING_SECRET");
+    expect(fakeHttp.get).not.toHaveBeenCalled();
+  });
+
+  it("returns [] for unknown slug", () => {
+    const fakeHttp = { get: () => { throw new Error(); } };
+    const api = new IntegrationsAPI(fakeHttp as never);
+    expect(api.envVars("not-a-slug")).toEqual([]);
+  });
+});
