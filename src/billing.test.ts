@@ -1,6 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { HttpAdapter } from "./_http";
 import { BillingAPI } from "./billing";
+
+beforeEach(() => { vi.stubEnv("VENDO_API_KEY", "vendo_sk_test"); });
+afterEach(() => { vi.unstubAllEnvs(); });
 
 function makeHttp(overrides?: Partial<HttpAdapter>): HttpAdapter {
   return {

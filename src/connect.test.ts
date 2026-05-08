@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { connectUrl } from "./connect";
+
+beforeEach(() => { vi.stubEnv("VENDO_API_KEY", "vendo_sk_test"); });
+afterEach(() => { vi.unstubAllEnvs(); });
 
 describe("connectUrl", () => {
   it("generates the correct URL with apiKey", () => {
