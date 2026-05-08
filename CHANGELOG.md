@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.3 -- 2026-05-08
+
+### Added
+- `Connection.envBootstrap`: surfaced from the Vendo `/api/deployments/me/connections` payload. Shape: `{ vars: [{ name, valueFrom }], restart: "gateway" | "none" } | null`. Mirrors the Python `vendo-sdk` field. Used by reconciler-style apps that translate connection state into env vars.
+- Exported types: `EnvBootstrap`, `EnvBootstrapVar`.
+
 ## v0.5.2 — 2026-05-08
 
 ### Added

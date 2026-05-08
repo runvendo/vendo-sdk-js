@@ -83,3 +83,77 @@ describe("ConnectionsAPI", () => {
     expect(conn).toBeNull();
   });
 });
+
+describe("Connection.envBootstrap (Plan 8 schema unification)", () => {
+  it("env_bootstrap parsed from raw payload", async () => {
+    const { ConnectionsAPI } = await import("./connections");
+    const fakeHttp = {
+      get: async () => ({
+        connections: [{
+          id: "conn_x",
+          external_id: "ext_y",
+          slug: "openai",
+          display_name: "OpenAI",
+          category: "ai",
+          profile: "vendo_managed_pool",
+          status: "connected",
+          metadata: {},
+          credential: null,
+          setup_url: null,
+          error_message: null,
+          connected_at: "2026-05-08T01:00:00Z",
+          env_bootstrap: {
+            vars: [
+              { name: "OPENAI_API_KEY", value_from: "credential.vendo_sk" },
+            ],
+            restart: "gateway",
+          },
+        }],
+      }),
+    };
+    const api = new ConnectionsAPI(fakeHttp as never);
+    const [conn] = await api.list();
+    expect(conn.envBootstrap).toEqual({
+      vars: [{ name: "OPENAI_API_KEY", valueFrom: "credential.vendo_sk" }],
+      restart: "gateway",
+    });
+  });
+
+  it("env_bootstrap absent results in null", async () => {
+    const { ConnectionsAPI } = await import("./connections");
+    const fakeHttp = {
+      get: async () => ({
+        connections: [{
+          id: "c", external_id: "e", slug: "telegram", display_name: "Telegram",
+          category: "messaging", profile: "byok_static", status: "connected",
+          metadata: {}, credential: null, setup_url: null, error_message: null,
+          connected_at: null,
+        }],
+      }),
+    };
+    const api = new ConnectionsAPI(fakeHttp as never);
+    const [conn] = await api.list();
+    expect(conn.envBootstrap).toBeNull();
+  });
+
+  it("env_bootstrap with restart=none parses correctly", async () => {
+    const { ConnectionsAPI } = await import("./connections");
+    const fakeHttp = {
+      get: async () => ({
+        connections: [{
+          id: "c", external_id: "e", slug: "telegram", display_name: "Telegram",
+          category: "messaging", profile: "byok_static", status: "connected",
+          metadata: {}, credential: null, setup_url: null, error_message: null,
+          connected_at: null,
+          env_bootstrap: {
+            vars: [{ name: "TELEGRAM_BOT_TOKEN", value_from: "credential.bot_token" }],
+            restart: "none",
+          },
+        }],
+      }),
+    };
+    const api = new ConnectionsAPI(fakeHttp as never);
+    const [conn] = await api.list();
+    expect(conn.envBootstrap?.restart).toBe("none");
+  });
+});
