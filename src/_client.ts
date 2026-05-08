@@ -3,6 +3,7 @@ import { AuthError, IdentityNotPresent, NotConnected, fromResponse } from "./err
 import { ConnectionsAPI } from "./connections";
 import { IntegrationsAPI } from "./integrations";
 import { BillingAPI } from "./billing";
+import { WebhooksAPI } from "./webhooks";
 import { connectUrl, type ConnectUrlOptions } from "./connect";
 import { requireVendoMode } from "./_mode";
 
@@ -25,6 +26,7 @@ export class Vendo {
   readonly connections: ConnectionsAPI;
   readonly integrations: IntegrationsAPI;
   readonly billing: BillingAPI;
+  readonly webhooks: WebhooksAPI;
 
   private _tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
@@ -65,6 +67,7 @@ export class Vendo {
     this.connections = new ConnectionsAPI(this._http);
     this.integrations = new IntegrationsAPI(this._http);
     this.billing = new BillingAPI(this._http);
+    this.webhooks = new WebhooksAPI();
   }
 
   forUser(userJwt: string): Vendo {
@@ -89,6 +92,7 @@ export class Vendo {
     (child as { connections: ConnectionsAPI }).connections = new ConnectionsAPI(child._http);
     (child as { integrations: IntegrationsAPI }).integrations = new IntegrationsAPI(child._http);
     (child as { billing: BillingAPI }).billing = new BillingAPI(child._http);
+    (child as { webhooks: WebhooksAPI }).webhooks = new WebhooksAPI();
     return child;
   }
 

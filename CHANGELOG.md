@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.1 — 2026-05-08
+
+### Added
+- `WebhooksAPI`: HMAC-SHA256 verifier for inbound Vendo webhooks. `vendo.webhooks.verify(headers, body)` returns a typed `WebhookEvent` or throws `ValidationError`. Reads `VENDO_WEBHOOK_SECRET` from env (or pass `{ secret }` to the constructor). Replay protection: rejects timestamps more than 5 minutes off (`maxAgeSec` configurable).
+- `Vendo.webhooks` instance property exposing the same.
+- Works in OSS mode too: verification is local (no network call).
+
 ## v0.5.0 — 2026-05-08
 
 ### Added
