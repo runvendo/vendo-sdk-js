@@ -1,4 +1,5 @@
 import { defineConfig } from "tsup";
+import { cp } from "node:fs/promises";
 
 export default defineConfig([
   // Main SDK entry — CommonJS + ESM for Node.js consumers
@@ -9,6 +10,10 @@ export default defineConfig([
     clean: true,
     target: "es2022",
     outDir: "dist",
+    shims: true,
+    async onSuccess() {
+      await cp("src/_data", "dist/_data", { recursive: true });
+    },
   },
   // Browser Web Components entry — ESM only (targets modern browsers, no framework deps)
   {
