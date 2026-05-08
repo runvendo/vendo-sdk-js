@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.0.0 -- 2026-05-08
+
+First stable release. The SDK runs as plain OSS (BYOK env vars) or as a Vendo-deployed app (set `VENDO_API_KEY`). Same code, both modes. Mirrors the Python `vendo-sdk` v1.0.0 surface.
+
+### Headline
+
+- **OSS / BYOK mode** (`v0.5.0`). `vendo.token("openai")` reads `OPENAI_API_KEY` when `VENDO_API_KEY` is unset. Bundled env-var catalog at `dist/_data/byok.json`. 4-step resolution: `VENDO_TOKEN_<SLUG>` -> Vendo backend -> BYOK env var -> `NotConnected`.
+- **Multi-tenant** (`v0.5.0`). `Vendo.forRequest(headers)` and `Vendo.forUser(jwt)` scope the client to a user. `X-Vendo-User-JWT` injected on every outbound call from the cloned client and its sub-APIs. `IdentityNotPresent` when the header is missing.
+- **Webhooks** (`v0.5.1`). `vendo.webhooks.verify(headers, body)` HMAC-SHA256 verifier, replay protection, constant-time signature compare. Works in any mode.
+- **Events** (`v0.5.2`). `vendo.events.subscribe()` returns an async iterable over `EventStreamMessage` from the Vendo SSE stream. Auto-reconnect with exponential backoff. Vendo-only.
+- **Schema parity** (`v0.5.3`). `Connection.envBootstrap` surfaced from the Vendo wire format. Mirrors the Python `Connection.env_bootstrap` field.
+- **Typed errors**: `VendoError`, `AuthError`, `NotConnected`, `NeedsReauth`, `BalanceExhausted`, `SpendCapExceeded`, `RateLimited`, `UpstreamError`, `ValidationError`, `IdempotencyConflict`, `VendoOnlyFeature`, `IdentityNotPresent`.
+- **Helpers**: `isVendoMode()`, `vendo.integrations.envVars(slug)`.
+
+### Vendo-only surfaces in OSS mode
+
+These throw `VendoOnlyFeature` (clear, typed error) in OSS mode: `BillingAPI.balance/spendCaps/usage`, `connectUrl` (module + class), `EventsAPI.subscribe`, `Vendo.forRequest`. Set `VENDO_API_KEY` to enable.
+
+### Backwards-compatibility breaks vs v0.4.1
+
+- `Vendo.token(slug)` no longer throws `AuthError` when `VENDO_API_KEY` is unset. It falls back to BYOK env vars. Apps that relied on the old behavior must catch `NotConnected` (or set `VENDO_API_KEY`).
+- `BillingAPI.balance/spendCaps/usage` throw `VendoOnlyFeature` in OSS mode (was: hit the network and 401).
+- `Vendo.connectUrl` and module-level `connectUrl` throw `VendoOnlyFeature` in OSS mode.
+
+### Legacy still supported
+
+`getCredential()`, `CredentialResponse`, `VendoSdkError`, `_clearCacheForTesting` are still exported from `@vendodev/sdk` for backwards compatibility with the original `0.0.x` surface. Prefer the `Vendo` class.
+
+### Browser bundle
+
+`@vendodev/sdk/browser` (`<vendo-connect-button>`, `<vendo-connection-card>`, `openPopup`, `openSseStream`) unchanged. CSS custom properties frozen.
+
+### Deferred to v1.x
+
+- AI gateway helpers (`vendo.ai.*`).
+- Logger / metrics shippers.
+
 ## v0.5.3 -- 2026-05-08
 
 ### Added
