@@ -10,6 +10,8 @@ import {
   UpstreamError,
   ValidationError,
   IdempotencyConflict,
+  VendoOnlyFeature,
+  IdentityNotPresent,
   fromResponse,
 } from "./errors";
 
@@ -98,5 +100,39 @@ describe("fromResponse", () => {
       const instance = new Cls("test", { code: "test" });
       expect(instance).toBeInstanceOf(VendoError);
     }
+  });
+});
+
+describe("VendoOnlyFeature", () => {
+  it("inherits from VendoError with code", () => {
+    const e = new VendoOnlyFeature("billing.balance not in OSS mode");
+    expect(e).toBeInstanceOf(VendoError);
+    expect(e.code).toBe("vendo_only_feature");
+  });
+
+  it("fromResponse maps the code", () => {
+    const e = fromResponse({
+      status: 403,
+      headers: { "Vendo-Error-Code": "vendo_only_feature" },
+      body: { error: { code: "vendo_only_feature", message: "x" } },
+    });
+    expect(e).toBeInstanceOf(VendoOnlyFeature);
+  });
+});
+
+describe("IdentityNotPresent", () => {
+  it("inherits from VendoError with code", () => {
+    const e = new IdentityNotPresent("X-Vendo-User-JWT missing");
+    expect(e).toBeInstanceOf(VendoError);
+    expect(e.code).toBe("identity_not_present");
+  });
+
+  it("fromResponse maps the code", () => {
+    const e = fromResponse({
+      status: 401,
+      headers: { "Vendo-Error-Code": "identity_not_present" },
+      body: { error: { code: "identity_not_present", message: "x" } },
+    });
+    expect(e).toBeInstanceOf(IdentityNotPresent);
   });
 });

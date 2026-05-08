@@ -91,6 +91,20 @@ export class IdempotencyConflict extends VendoError {
   }
 }
 
+export class VendoOnlyFeature extends VendoError {
+  constructor(message: string, init?: ConstructorParameters<typeof VendoError>[1]) {
+    super(message, { code: "vendo_only_feature", ...init });
+    this.name = "VendoOnlyFeature";
+  }
+}
+
+export class IdentityNotPresent extends VendoError {
+  constructor(message: string, init?: ConstructorParameters<typeof VendoError>[1]) {
+    super(message, { code: "identity_not_present", ...init });
+    this.name = "IdentityNotPresent";
+  }
+}
+
 type VendoErrorInit = ConstructorParameters<typeof VendoError>[1];
 type VendoErrorCtor = new (message: string, init?: VendoErrorInit) => VendoError;
 
@@ -108,6 +122,8 @@ const CODE_TO_CLASS: Record<string, VendoErrorCtor> = {
   upstream_error: UpstreamError,
   validation_failed: ValidationError,
   idempotency_conflict: IdempotencyConflict,
+  vendo_only_feature: VendoOnlyFeature,
+  identity_not_present: IdentityNotPresent,
 };
 
 export function fromResponse(args: {

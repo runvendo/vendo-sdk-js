@@ -1,0 +1,56 @@
+{
+  "$schema": "./byok.schema.json",
+  "version": 1,
+  "integrations": {
+    "openai": {
+      "vars": ["OPENAI_API_KEY"],
+      "primary": "OPENAI_API_KEY",
+      "oauth": false
+    },
+    "anthropic": {
+      "vars": ["ANTHROPIC_API_KEY"],
+      "primary": "ANTHROPIC_API_KEY",
+      "oauth": false
+    },
+    "openrouter": {
+      "vars": ["OPENROUTER_API_KEY"],
+      "primary": "OPENROUTER_API_KEY",
+      "oauth": false
+    },
+    "telegram": {
+      "vars": ["TELEGRAM_BOT_TOKEN"],
+      "primary": "TELEGRAM_BOT_TOKEN",
+      "oauth": false
+    },
+    "elevenlabs": {
+      "vars": ["ELEVENLABS_API_KEY"],
+      "primary": "ELEVENLABS_API_KEY",
+      "oauth": false
+    },
+    "assemblyai": {
+      "vars": ["ASSEMBLYAI_API_KEY"],
+      "primary": "ASSEMBLYAI_API_KEY",
+      "oauth": false
+    },
+    "muapi": {
+      "vars": ["MUAPI_API_KEY"],
+      "primary": "MUAPI_API_KEY",
+      "oauth": false
+    },
+    "notion": {
+      "vars": ["NOTION_API_TOKEN"],
+      "primary": "NOTION_API_TOKEN",
+      "oauth": true
+    },
+    "gmail": {
+      "vars": ["GMAIL_ACCESS_TOKEN"],
+      "primary": "GMAIL_ACCESS_TOKEN",
+      "oauth": true
+    },
+    "slack": {
+      "vars": ["SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"],
+      "primary": "SLACK_BOT_TOKEN",
+      "oauth": true
+    }
+  }
+}

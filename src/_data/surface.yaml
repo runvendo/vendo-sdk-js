@@ -1,0 +1,131 @@
+# Vendo SDK API Surface Manifest
+# Authoritative list of methods both vendo-sdk-py and @vendodev/sdk MUST implement.
+# Drift is a build error in both SDKs.
+#
+# Methods are namespaced by the class/module they live on.
+# Naming: snake_case here; each SDK applies its language idiom (Python keeps
+# snake_case; TS converts to camelCase).
+#
+# v1.0 surface. Extending after release requires bumping manifest_version
+# AND landing the change in both SDKs before publishing.
+
+api_version: "2026-05-07"
+manifest_version: 2
+
+client:
+  - name: "is_vendo_mode"
+    args: []
+    returns: "bool"
+    description: "True when VENDO_API_KEY is present (Vendo mode); false in BYOK/OSS mode"
+
+  - name: "for_user"
+    args: ["user_jwt"]
+    description: "Return a new client instance scoped to a user JWT (escape hatch). Vendo mode only"
+
+  - name: "for_request"
+    args: ["headers"]
+    description: "Return a new client scoped to the X-Vendo-User-JWT extracted from request headers. Vendo mode only"
+
+  - name: "token"
+    args: ["slug"]
+    returns: "string"
+
+  - name: "tokens"
+    args: ["slugs"]
+    returns: "map[slug -> string|null]"
+
+  - name: "invalidate"
+    args: ["slug"]
+    returns: "void"
+
+  - name: "connect_url"
+    args: ["slug", "*", "return_to?", "state?"]
+    returns: "string"
+    description: "Vendo mode only. Path: /connections/connect/{slug}"
+
+connections_api:
+  - name: "list"
+    returns: "Connection[]"
+  - name: "get"
+    args: ["slug"]
+    returns: "Connection | null"
+
+integrations_api:
+  - name: "list"
+    returns: "Integration[]"
+  - name: "get"
+    args: ["slug"]
+    returns: "Integration | null"
+  - name: "env_vars"
+    args: ["slug"]
+    returns: "EnvVarMap"
+    description: "Returns BYOK env-var names for the slug. Works in any mode"
+
+billing_api:
+  - name: "balance"
+    returns: "Balance"
+    description: "Vendo mode only"
+  - name: "spend_caps"
+    returns: "SpendCaps"
+    description: "Vendo mode only"
+  - name: "usage"
+    args: ["*", "period?"]
+    returns: "object"
+    description: "Vendo mode only"
+
+events_api:
+  - name: "subscribe"
+    returns: "AsyncIterable<Event>"
+    description: "Server-side SSE stream. Vendo mode only"
+
+webhooks_api:
+  - name: "verify"
+    args: ["headers", "body"]
+    returns: "WebhookEvent"
+    description: "HMAC verify. Works in any mode (uses VENDO_WEBHOOK_SECRET env var)"
+
+sso_api:
+  - name: "is_enabled"
+    returns: "bool"
+  - name: "identity_from_headers"
+    args: ["headers"]
+    returns: "Identity | null"
+
+deployment_api:
+  - name: "tenant_id"
+    returns: "string | null"
+  - name: "deployment_id"
+    returns: "string | null"
+  - name: "deployment_slug"
+    returns: "string | null"
+  - name: "is_running_on_vendo"
+    returns: "bool"
+
+errors:
+  - "VendoError"
+  - "AuthError"
+  - "NotConnected"
+  - "NeedsReauth"
+  - "BalanceExhausted"
+  - "SpendCapExceeded"
+  - "RateLimited"
+  - "UpstreamError"
+  - "ValidationError"
+  - "IdempotencyConflict"
+  - "VendoOnlyFeature"
+  - "IdentityNotPresent"
+
+testing:
+  - "MockClient"
+  - "fake_connection"
+  - "MockSSE"
+
+reconciler:
+  - name: "bootstrap"
+    args: ["*", "env_file", "mapping"]
+  - name: "start"
+    args: ["*", "env_file", "mapping", "on_change?", "reload_url?"]
+    returns: "Reconciler (with .stop())"
+  - name: "catalog_default"
+    args: ["client?"]
+    returns: "(mapping, restart_handler_factory)"
