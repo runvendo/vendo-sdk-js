@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.1 -- 2026-05-11
+
+Performance fix for browser web components. Before this release each `<vendo-connection-card>` made its own `GET /api/deployments/me/connections` and opened its own SSE stream on mount. With N enabled integrations the onboarding panel fired N redundant full-list fetches and N concurrent SSE streams to the same origin, which browsers serialized under per-origin connection limits — cards visibly loaded one-by-one over many seconds.
+
+- **New `connectionsStore`** (`src/browser/connectionsStore.ts`). Process-wide singleton refcounted by `(baseUrl, apiKey)`. First subscriber kicks off one shared fetch + one SSE stream; the last unsubscribe tears them down. Subscribers are notified per slug.
+- **`VendoConnectionCard` rewired** through the store. `_fetchState`/`_openSse` removed. No public-API change — `slug`, `api-key`, `base-url`, etc. behave identically.
+- **`ConnectionsAPI.list()` in-flight dedupe**. Concurrent `list()` calls share one HTTP request. Collapses the SSE-event storms that `VendoProvider` (in `@vendodev/connect-portal`) triggers on every `connection.*` event.
+- **No breaking changes.** Bundle size unchanged (browser entry stays at 24.9 KB).
+
 ## v1.0.0 -- 2026-05-08
 
 First stable release. The SDK runs as plain OSS (BYOK env vars) or as a Vendo-deployed app (set `VENDO_API_KEY`). Same code, both modes. Mirrors the Python `vendo-sdk` v1.0.0 surface.

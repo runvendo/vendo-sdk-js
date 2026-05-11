@@ -92,13 +92,27 @@ function fromRaw(raw: RawConnection): Connection {
 }
 
 export class ConnectionsAPI {
+  // Concurrent `list()` calls share one HTTP request. Cleared as soon as
+  // the response (or error) settles, so this is *not* a TTL cache — it only
+  // collapses SSE-event storms where VendoProvider fires `c.connections.get`
+  // for every connection.* event arriving in the same tick.
+  private _inFlight: Promise<Connection[]> | null = null;
+
   constructor(private http: HttpAdapter) {}
 
   async list(): Promise<Connection[]> {
-    const body = await this.http.get<{ connections: RawConnection[] }>(
-      "/api/deployments/me/connections",
-    );
-    return (body.connections ?? []).map(fromRaw);
+    if (this._inFlight) return this._inFlight;
+    this._inFlight = (async () => {
+      try {
+        const body = await this.http.get<{ connections: RawConnection[] }>(
+          "/api/deployments/me/connections",
+        );
+        return (body.connections ?? []).map(fromRaw);
+      } finally {
+        this._inFlight = null;
+      }
+    })();
+    return this._inFlight;
   }
 
   async get(slug: string): Promise<Connection | null> {

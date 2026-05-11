@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as sseModule from "../sse-client.js";
+import { _resetConnectionsStoreForTesting } from "../connectionsStore.js";
 
 // Register the element once before tests run
 let VendoConnectionCardClass: typeof import("./VendoConnectionCard.js").VendoConnectionCard;
@@ -10,9 +11,13 @@ beforeEach(async () => {
   if (!customElements.get("vendo-connection-card")) {
     customElements.define("vendo-connection-card", VendoConnectionCardClass);
   }
+  // The store is a process-wide singleton; reset between tests so each
+  // test gets a clean fetch/SSE refcount and cache.
+  _resetConnectionsStoreForTesting();
 });
 
 afterEach(() => {
+  _resetConnectionsStoreForTesting();
   vi.restoreAllMocks();
   document.body.innerHTML = "";
 });
