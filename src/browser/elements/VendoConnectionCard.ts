@@ -1,5 +1,10 @@
 import { openPopup } from "../popup.js";
-import { openSseStream, type SseCleanup } from "../sse-client.js";
+import {
+  subscribeConnection,
+  refreshConnections,
+  type RawConn,
+  type ConnectionStatus,
+} from "../connectionsStore.js";
 
 type CardStatus =
   | "loading"
@@ -14,16 +19,6 @@ interface ConnectionInfo {
   id: string;
   displayName?: string;
   errorMessage?: string;
-}
-
-interface RawConn {
-  slug: string;
-  status: string;
-  id: string;
-  display_name?: string;
-  error_message?: string;
-  logo_url?: string;
-  brand_color?: string;
 }
 
 function escapeHtml(s: string): string {
@@ -107,7 +102,7 @@ export class VendoConnectionCard extends HTMLElement {
   private _displayName = "";
   private _logoUrl = "";
   private _brandColor = "";
-  private _sseCleanup: SseCleanup | null = null;
+  private _storeUnsubscribe: (() => void) | null = null;
   private _shadow: ShadowRoot | null = null;
   private _cancelInFlight: (() => void) | null = null;
 
@@ -118,37 +113,71 @@ export class VendoConnectionCard extends HTMLElement {
       this._brandColor = this.getAttribute("brand-color") ?? "";
       this._render();
     }
-    const slug = this.getAttribute("slug");
-    const apiKey = this._resolveApiKey();
-    if (slug && apiKey) {
-      void this._fetchState();
-      this._openSse();
-    }
+    this._subscribeToStore();
   }
 
   disconnectedCallback(): void {
-    this._sseCleanup?.();
-    this._sseCleanup = null;
+    this._storeUnsubscribe?.();
+    this._storeUnsubscribe = null;
     this._cancelInFlight?.();
     this._cancelInFlight = null;
   }
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
     if ((name === "slug" || name === "api-key") && oldValue !== newValue && oldValue !== null) {
-      this._sseCleanup?.();
-      this._sseCleanup = null;
+      // Drop the previous subscription and resubscribe under the new
+      // (baseUrl, apiKey, slug) tuple. The store collapses repeat
+      // (baseUrl, apiKey) pairs into one fetch + one SSE stream regardless
+      // of how many slugs are subscribed.
+      this._storeUnsubscribe?.();
+      this._storeUnsubscribe = null;
       this._status = "loading";
       this._connection = null;
       this._displayName = "";
-      const slug = this.getAttribute("slug");
-      const apiKey = this._resolveApiKey();
-      if (slug && apiKey) {
-        void this._fetchState();
-        this._openSse();
-      }
+      this._subscribeToStore();
     }
     if (name === "logo-url") this._logoUrl = newValue ?? "";
     if (name === "brand-color") this._brandColor = newValue ?? "";
+    this._render();
+  }
+
+  private _subscribeToStore(): void {
+    const slug = this.getAttribute("slug");
+    const apiKey = this._resolveApiKey();
+    if (!slug || !apiKey) return;
+    const baseUrl = this._apiBaseUrl();
+    this._storeUnsubscribe = subscribeConnection(
+      baseUrl,
+      apiKey,
+      slug,
+      (conn, status) => this._applyStoreUpdate(conn, status),
+    );
+  }
+
+  private _applyStoreUpdate(conn: RawConn | undefined, status: ConnectionStatus): void {
+    const slug = this.getAttribute("slug") ?? "";
+    // While the very first fetch is in flight and we have no cached row,
+    // keep the skeleton up. After the fetch resolves (or errors), absence
+    // of a matching row means the integration is `available`.
+    if (status === "loading" && !conn) {
+      this._status = "loading";
+      this._render();
+      return;
+    }
+    if (conn) {
+      this._connection = {
+        id: conn.id,
+        displayName: conn.display_name,
+        errorMessage: conn.error_message,
+      };
+      this._status = (conn.status as CardStatus) ?? "available";
+      this._displayName = conn.display_name ?? slug;
+      if (conn.logo_url && !this.getAttribute("logo-url")) this._logoUrl = conn.logo_url;
+      if (conn.brand_color && !this.getAttribute("brand-color")) this._brandColor = conn.brand_color;
+    } else {
+      this._connection = null;
+      this._status = "available";
+    }
     this._render();
   }
 
@@ -179,73 +208,6 @@ export class VendoConnectionCard extends HTMLElement {
       return `${origin}${raw}`;
     }
     return "";
-  }
-
-  private async _fetchState(): Promise<void> {
-    const key = this._resolveApiKey();
-    const baseUrl = this._apiBaseUrl();
-    const slug = this.getAttribute("slug") ?? "";
-    if (!key) return;
-    try {
-      const res = await fetch(`${baseUrl}/api/deployments/me/connections`, {
-        headers: { Authorization: `Bearer ${key}` },
-      });
-      if (!res.ok) {
-        if (this._status === "loading") {
-          this._status = "available";
-          this._render();
-        }
-        return;
-      }
-      const body = (await res.json()) as
-        | Array<RawConn>
-        | { connections?: Array<RawConn> };
-      const all: Array<RawConn> = Array.isArray(body) ? body : body.connections ?? [];
-      const conn = all.find((c) => c.slug === slug);
-      if (conn) {
-        this._connection = {
-          id: conn.id,
-          displayName: conn.display_name,
-          errorMessage: conn.error_message,
-        };
-        this._status = (conn.status as CardStatus) ?? "available";
-        this._displayName = conn.display_name ?? slug;
-        if (conn.logo_url && !this.getAttribute("logo-url")) this._logoUrl = conn.logo_url;
-        if (conn.brand_color && !this.getAttribute("brand-color")) this._brandColor = conn.brand_color;
-      } else {
-        this._status = "available";
-      }
-      this._render();
-    } catch {
-      if (this._status === "loading") {
-        this._status = "available";
-        this._render();
-      }
-    }
-  }
-
-  private _openSse(): void {
-    const key = this._resolveApiKey();
-    const baseUrl = this._apiBaseUrl();
-    const slug = this.getAttribute("slug") ?? "";
-    if (!key) return;
-    this._sseCleanup = openSseStream(
-      `${baseUrl}/api/deployments/me/events`,
-      key,
-      (event) => {
-        if (
-          event.type === "connection_updated" ||
-          event.type === "connection_created" ||
-          event.type === "connection_deleted"
-        ) {
-          const data = event.data as { slug?: string } | null;
-          if (!data || data.slug === slug) {
-            void this._fetchState();
-          }
-        }
-      },
-      (err) => console.warn("[vendo-connection-card] SSE error:", err.message),
-    );
   }
 
   _setState(status: CardStatus, connection?: ConnectionInfo): void {
@@ -292,7 +254,11 @@ export class VendoConnectionCard extends HTMLElement {
             detail: { connectionId: result.connectionId },
           }),
         );
-        void this._fetchState();
+        // SSE will eventually deliver the connection_updated event, but a
+        // proactive refetch flips every subscribed card to the new state
+        // immediately rather than waiting on stream latency.
+        const apiKey = this._resolveApiKey();
+        if (apiKey) void refreshConnections(this._apiBaseUrl(), apiKey);
       } else if (result.status === "redirected") {
         return;
       } else {
