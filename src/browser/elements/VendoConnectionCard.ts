@@ -30,6 +30,10 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+// `--vendo-card-backdrop-filter` is only meaningful for `glass-*` themes, which
+// set it to `blur(16px) saturate(140%)` so the card surface frosts over the
+// host page background. Non-glass themes leave it `none` so opaque surfaces
+// render without compositor overhead.
 const THEMES: Record<string, string> = {
   default: `
     --vendo-color-brand: #2B7A5E;
@@ -42,6 +46,7 @@ const THEMES: Record<string, string> = {
     --vendo-color-error: #C44B3B;
     --vendo-color-skeleton: #E6DDD0;
     --vendo-radius: 8px;
+    --vendo-card-backdrop-filter: none;
   `,
   beige: `
     --vendo-color-brand: #2B7A5E;
@@ -54,6 +59,7 @@ const THEMES: Record<string, string> = {
     --vendo-color-error: #C44B3B;
     --vendo-color-skeleton: #D5C9B8;
     --vendo-radius: 8px;
+    --vendo-card-backdrop-filter: none;
   `,
   dark: `
     --vendo-color-brand: #4D9E7C;
@@ -66,6 +72,33 @@ const THEMES: Record<string, string> = {
     --vendo-color-error: #E5796A;
     --vendo-color-skeleton: #35342F;
     --vendo-radius: 8px;
+    --vendo-card-backdrop-filter: none;
+  `,
+  "glass-light": `
+    --vendo-color-brand: #2B7A5E;
+    --vendo-color-border: rgba(28, 27, 24, 0.10);
+    --vendo-color-surface: rgba(255, 255, 255, 0.45);
+    --vendo-color-text: #1C1B18;
+    --vendo-color-muted: #4E4D49;
+    --vendo-color-success: #3A8B52;
+    --vendo-color-warning: #C4922A;
+    --vendo-color-error: #C44B3B;
+    --vendo-color-skeleton: rgba(28, 27, 24, 0.08);
+    --vendo-radius: 8px;
+    --vendo-card-backdrop-filter: blur(16px) saturate(140%);
+  `,
+  "glass-dark": `
+    --vendo-color-brand: #4D9E7C;
+    --vendo-color-border: rgba(250, 247, 242, 0.12);
+    --vendo-color-surface: rgba(28, 27, 24, 0.45);
+    --vendo-color-text: #FAF7F2;
+    --vendo-color-muted: #C1B7AB;
+    --vendo-color-success: #4D9E7C;
+    --vendo-color-warning: #DBA83A;
+    --vendo-color-error: #E16D5A;
+    --vendo-color-skeleton: rgba(250, 247, 242, 0.10);
+    --vendo-radius: 8px;
+    --vendo-card-backdrop-filter: blur(16px) saturate(140%);
   `,
 };
 
@@ -78,7 +111,7 @@ const THEMES: Record<string, string> = {
  *   base-url         (optional) — API base (empty = same-origin proxy); defaults to https://vendo.run
  *   connect-origin   (optional) — origin for OAuth popups + manage links; defaults to https://vendo.run
  *   manage-base-url  (optional) — override for the dashboard origin
- *   theme            (optional) — "default" | "beige" | "dark"
+ *   theme            (optional) — "default" | "beige" | "dark" | "glass-light" | "glass-dark"
  *   compact          (boolean)  — compact layout
  *   logo-url         (optional) — logo image URL
  *   brand-color      (optional) — hex color for left accent border
@@ -379,6 +412,8 @@ export class VendoConnectionCard extends HTMLElement {
           border-radius: var(--vendo-radius);
           background: var(--vendo-color-surface);
           color: var(--vendo-color-text);
+          backdrop-filter: var(--vendo-card-backdrop-filter, none);
+          -webkit-backdrop-filter: var(--vendo-card-backdrop-filter, none);
           transition: border-left-color 0.2s, box-shadow 0.2s;
         }
         .vendo-card:hover {

@@ -1,6 +1,6 @@
 {
   "name": "@vendodev/sdk",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Vendo TypeScript SDK. Works as plain OSS (BYOK) or with VENDO_API_KEY for OAuth refresh, multi-tenant scoping, billing, events, and webhooks.",
   "license": "MIT",
   "type": "module",

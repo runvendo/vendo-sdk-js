@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.1.0 -- 2026-05-11
+
+Adds frosted-glass theme variants to the `<vendo-connection-card>` web component to match the React `@vendodev/connect-portal@0.4.0` portal. Cards render as translucent surfaces over the host page background (rgba surface + `backdrop-filter: blur(16px) saturate(140%)`), so they pick up tint from whatever is behind them.
+
+- **New `theme="glass-light"`** — translucent white card (45% alpha) + blur, for portals over light page backgrounds.
+- **New `theme="glass-dark"`** — translucent near-black card (45% alpha) + blur, for portals over dark page backgrounds.
+- **New `--vendo-card-backdrop-filter` CSS variable** drives the blur. Set to `none` on the three opaque themes so they skip the compositor cost. Hosts can override per-card via the standard CSS-variable channel.
+- **No breaking changes.** Existing `default` / `beige` / `dark` themes render identically (same surface colour, same border, same skeleton shimmer). Bundle size unchanged.
+
 ## v1.0.1 -- 2026-05-11
 
 Performance fix for browser web components. Before this release each `<vendo-connection-card>` made its own `GET /api/deployments/me/connections` and opened its own SSE stream on mount. With N enabled integrations the onboarding panel fired N redundant full-list fetches and N concurrent SSE streams to the same origin, which browsers serialized under per-origin connection limits — cards visibly loaded one-by-one over many seconds.
