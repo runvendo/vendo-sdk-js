@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.2.0 -- 2026-05-11
+
+Stops the main entry from forcing Node-only imports into browser bundles. React + vanilla consumers can now `import { Vendo, connectUrl } from '@vendodev/sdk'` in a Vite / CF Workers / browser context without the silent `(0, import_url.fileURLToPath) is not a function` crash.
+
+- **Inlined `_data/byok.json` into `_byok.ts`.** Previously `_byok.ts` did a top-level `fileURLToPath(import.meta.url)` to locate `_data/byok.json` on disk, then `readFileSync` at first use. The IIFE ran at module load and crashed in browsers because `node:url` resolves to a stub there. The 1.3 KB JSON is now a static `import` and inlines at build time — zero `node:fs` / `node:path` / `node:url` references in the main bundle.
+- **`reconciler` moved to its own subpath export.** Was `export * as reconciler from "./reconciler"` on the main entry. Now `import * as reconciler from "@vendodev/sdk/reconciler"`. Reconciler is Node-only (file-watching config reload), so isolating it keeps the dynamic `node:fs/promises` imports out of any browser-targeted dependency graph traversal.
+- **`requireVendoMode` accepts an explicit apiKey.** Previously the gate was env-only (`process.env.VENDO_API_KEY`), so Vendo-only features (`connectUrl`, `billing.*`, `events.subscribe`, `forRequest`) threw `VendoOnlyFeature` in every browser context — even when the caller had passed a real `vendo_sk_*` key. Call sites now pass their in-scope key to the gate; runtime callers in browsers work, env-based callers in Node are unchanged.
+- **`HttpAdapter` binds `globalThis.fetch` to `globalThis`.** Browser `fetch` checks its receiver is the `Window` and throws "Illegal invocation" when called as a method on any other object. The adapter stored `globalThis.fetch` unbound and invoked it via `this.fetch(...)`, breaking every HTTP call in browsers. Now bound at construction — Node `undici` is unaffected (no receiver check).
+- **Breaking (technically):** the `import * as reconciler from '@vendodev/sdk'` namespace path no longer resolves. Migrate to the subpath import. No runtime consumers existed — reconciler only ran in Node anyway — so this is a no-op in practice.
+
 ## v1.1.0 -- 2026-05-11
 
 Adds frosted-glass theme variants to the `<vendo-connection-card>` web component to match the React `@vendodev/connect-portal@0.4.0` portal. Cards render as translucent surfaces over the host page background (rgba surface + `backdrop-filter: blur(16px) saturate(140%)`), so they pick up tint from whatever is behind them.

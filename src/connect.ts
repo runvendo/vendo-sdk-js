@@ -9,7 +9,7 @@ export interface ConnectUrlOptions {
 }
 
 export function connectUrl(slug: string, opts: ConnectUrlOptions): string {
-  requireVendoMode("connectUrl");
+  requireVendoMode("connectUrl", opts.apiKey);
   const base = (opts.baseUrl ?? "https://vendo.run").replace(/\/$/, "");
   const qs = new URLSearchParams();
   qs.set("app_key", opts.apiKey);

@@ -15,6 +15,16 @@ export default defineConfig([
       await cp("src/_data", "dist/_data", { recursive: true });
     },
   },
+  // Reconciler entry — Node-only, opt-in via "@vendodev/sdk/reconciler"
+  {
+    entry: { reconciler: "src/reconciler.ts" },
+    format: ["cjs", "esm"],
+    dts: true,
+    clean: false,
+    target: "es2022",
+    outDir: "dist",
+    shims: true,
+  },
   // Browser Web Components entry — ESM only (targets modern browsers, no framework deps)
   {
     entry: { "browser/index": "src/browser/index.ts" },

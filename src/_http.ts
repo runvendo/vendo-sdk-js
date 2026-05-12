@@ -53,7 +53,11 @@ export class HttpAdapter {
     this.timeoutMs = opts.timeoutMs ?? 30_000;
     this.userAgent = opts.userAgent ?? USER_AGENT;
     this.userJwt = opts.userJwt;
-    const f = opts.fetch ?? (globalThis as { fetch?: typeof fetch }).fetch;
+    // Browser `fetch` checks its receiver is the `Window` (or `WorkerGlobalScope`)
+    // — calling it as a method on any other object throws "Illegal invocation".
+    // Bind a captured global to `globalThis` so consumers can use `this.fetch`
+    // freely. Explicit `opts.fetch` is trusted (caller already bound it).
+    const f = opts.fetch ?? (globalThis as { fetch?: typeof fetch }).fetch?.bind(globalThis);
     if (!f) throw new VendoError("fetch is not available", { code: "internal_error" });
     this.fetch = f;
   }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Vendo } from "./_client";
-import { IdentityNotPresent, VendoOnlyFeature } from "./errors";
+import { IdentityNotPresent } from "./errors";
 
 const captured: Record<string, string | undefined> = {};
 beforeEach(() => { captured.VENDO_API_KEY = process.env.VENDO_API_KEY; });
@@ -68,10 +68,10 @@ describe("forRequest", () => {
     expect(() => new Vendo().forRequest({ "X-Vendo-User-JWT": "   " })).toThrow(IdentityNotPresent);
   });
 
-  it("throws VendoOnlyFeature in OSS mode", () => {
+  it("works with apiKey from the instance even after env is unset (browser-safe)", () => {
     process.env.VENDO_API_KEY = "vendo_sk_test";
     const v = new Vendo();
     delete process.env.VENDO_API_KEY;
-    expect(() => v.forRequest({ "X-Vendo-User-JWT": "anything" })).toThrow(VendoOnlyFeature);
+    expect(v.forRequest({ "X-Vendo-User-JWT": "any.jwt.value" })).toBeInstanceOf(Vendo);
   });
 });

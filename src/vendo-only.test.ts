@@ -32,17 +32,24 @@ describe("BillingAPI in OSS mode", () => {
   });
 });
 
-describe("connectUrl in OSS mode", () => {
-  it("module-level throws", () => {
+describe("connectUrl gate", () => {
+  it("module-level throws when no apiKey is supplied and env is unset", () => {
     delete process.env.VENDO_API_KEY;
-    expect(() => connectUrl("openai", { apiKey: "vendo_sk_x", returnTo: "https://x" }))
+    expect(() => connectUrl("openai", { apiKey: "", returnTo: "https://x" }))
       .toThrow(VendoOnlyFeature);
   });
 
-  it("Vendo.connectUrl throws", () => {
+  it("module-level accepts an explicit apiKey even without env (browser-safe)", () => {
+    delete process.env.VENDO_API_KEY;
+    expect(
+      connectUrl("openai", { apiKey: "vendo_sk_x", returnTo: "https://x" }),
+    ).toContain("app_key=vendo_sk_x");
+  });
+
+  it("Vendo.connectUrl works with apiKey from the instance, regardless of env", () => {
     process.env.VENDO_API_KEY = "vendo_sk_test";
     const v = new Vendo();
     delete process.env.VENDO_API_KEY;
-    expect(() => v.connectUrl("openai")).toThrow(VendoOnlyFeature);
+    expect(v.connectUrl("openai")).toContain("/connections/connect/openai");
   });
 });
