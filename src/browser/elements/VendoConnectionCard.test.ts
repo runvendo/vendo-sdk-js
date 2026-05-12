@@ -275,6 +275,38 @@ describe("<vendo-connection-card>", () => {
     expect(style!.textContent).toContain("--vendo-color-surface: #1C1B18");
   });
 
+  it("applies glass-light theme: translucent surface + backdrop-filter", async () => {
+    const el = createElement({ slug: "telegram", theme: "glass-light" });
+    el._setState("available");
+    await waitRender();
+    const shadow = el.shadowRoot!;
+    const style = shadow.querySelector("style");
+    expect(style!.textContent).toContain("--vendo-color-surface: rgba(255, 255, 255, 0.45)");
+    expect(style!.textContent).toContain("--vendo-card-backdrop-filter: blur(16px) saturate(140%)");
+    expect(style!.textContent).toContain("backdrop-filter: var(--vendo-card-backdrop-filter");
+    expect(style!.textContent).toContain("-webkit-backdrop-filter: var(--vendo-card-backdrop-filter");
+  });
+
+  it("applies glass-dark theme: translucent dark surface + backdrop-filter", async () => {
+    const el = createElement({ slug: "telegram", theme: "glass-dark" });
+    el._setState("available");
+    await waitRender();
+    const shadow = el.shadowRoot!;
+    const style = shadow.querySelector("style");
+    expect(style!.textContent).toContain("--vendo-color-surface: rgba(28, 27, 24, 0.45)");
+    expect(style!.textContent).toContain("--vendo-color-text: #FAF7F2");
+    expect(style!.textContent).toContain("--vendo-card-backdrop-filter: blur(16px) saturate(140%)");
+  });
+
+  it("non-glass themes set backdrop-filter to none so opaque themes skip compositor work", async () => {
+    const el = createElement({ slug: "telegram", theme: "dark" });
+    el._setState("available");
+    await waitRender();
+    const shadow = el.shadowRoot!;
+    const style = shadow.querySelector("style");
+    expect(style!.textContent).toContain("--vendo-card-backdrop-filter: none");
+  });
+
   it("shows integration name as title and display_name as subtitle", async () => {
     const el = createElement({ slug: "openai", name: "OpenAI" });
     el._setState("connected", { id: "conn-1", displayName: "OpenAI (Vendo managed)" });
