@@ -101,7 +101,7 @@ export class Vendo {
   }
 
   forRequest(headers: Headers | Record<string, string>): Vendo {
-    requireVendoMode("forRequest");
+    requireVendoMode("forRequest", this.apiKey);
     const jwt = readHeaderCaseInsensitive(headers, "X-Vendo-User-JWT");
     if (!jwt) {
       throw new IdentityNotPresent(
@@ -114,7 +114,7 @@ export class Vendo {
   }
 
   connectUrl(slug: string, opts?: Omit<ConnectUrlOptions, "apiKey" | "baseUrl">): string {
-    requireVendoMode("connectUrl");
+    requireVendoMode("connectUrl", this.apiKey);
     const root = this.baseUrl.replace(/\/api$/, "");
     return connectUrl(slug, { apiKey: this.apiKey, baseUrl: root, ...(opts ?? {}) });
   }

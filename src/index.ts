@@ -9,7 +9,6 @@ export * from "./testing";
 export { Vendo, type VendoOptions } from "./_client";
 export { HttpAdapter, DEFAULT_RETRY, type RetryPolicy } from "./_http";
 export { connectUrl, type ConnectUrlOptions } from "./connect";
-export * as reconciler from "./reconciler";
 export { isVendoMode } from "./_mode";
 
 // Legacy — kept for backwards compatibility. Prefer the Vendo class.

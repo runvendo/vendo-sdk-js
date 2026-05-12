@@ -23,7 +23,7 @@ export class EventsAPI {
   constructor(private readonly http: HttpAdapter) {}
 
   subscribe(opts: SubscribeOptions = {}): AsyncIterable<EventStreamMessage> {
-    requireVendoMode("events.subscribe");
+    requireVendoMode("events.subscribe", this.http.apiKey);
     return this._iterate(opts);
   }
 

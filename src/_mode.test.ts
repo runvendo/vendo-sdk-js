@@ -52,4 +52,15 @@ describe("requireVendoMode", () => {
       expect(msg).toContain("VENDO_API_KEY");
     }
   });
+
+  it("passes when explicit apiKey is supplied, even with no env", () => {
+    delete process.env.VENDO_API_KEY;
+    expect(() => requireVendoMode("connectUrl", "vendo_sk_test")).not.toThrow();
+  });
+
+  it("falls back to env when explicit apiKey is empty/whitespace", () => {
+    delete process.env.VENDO_API_KEY;
+    expect(() => requireVendoMode("connectUrl", "")).toThrow(VendoOnlyFeature);
+    expect(() => requireVendoMode("connectUrl", "   ")).toThrow(VendoOnlyFeature);
+  });
 });

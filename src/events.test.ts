@@ -83,9 +83,10 @@ describe("EventsAPI.subscribe", () => {
     expect(got[1]).toEqual({ type: "connection_updated", data: { slug: "openai" } });
   });
 
-  it("throws VendoOnlyFeature in OSS mode (synchronous, before iteration)", () => {
+  it("throws VendoOnlyFeature when adapter has no apiKey and env is unset", () => {
     delete process.env.VENDO_API_KEY;
     const adapter = fakeAdapterStreaming([]);
+    (adapter as { apiKey: string }).apiKey = "";
     const api = new EventsAPI(adapter);
     expect(() => api.subscribe()).toThrow(VendoOnlyFeature);
   });

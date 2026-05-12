@@ -1,6 +1,6 @@
 {
   "name": "@vendodev/sdk",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Vendo TypeScript SDK. Works as plain OSS (BYOK) or with VENDO_API_KEY for OAuth refresh, multi-tenant scoping, billing, events, and webhooks.",
   "license": "MIT",
   "type": "module",
@@ -18,6 +18,16 @@
       "require": {
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
+      }
+    },
+    "./reconciler": {
+      "import": {
+        "types": "./dist/reconciler.d.ts",
+        "default": "./dist/reconciler.js"
+      },
+      "require": {
+        "types": "./dist/reconciler.d.cts",
+        "default": "./dist/reconciler.cjs"
       }
     },
     "./browser": {
