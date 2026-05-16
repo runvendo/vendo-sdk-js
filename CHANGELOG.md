@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.3.0 -- 2026-05-15
+
+Adds `vendo.data.execute(action, args?)` — the SDK half of P5. Deployed tools
+can now call any Composio action against the deployment's connected accounts,
+billed via the `composio.action_call` meter. The proxy half
+(`composio-proxy.vendo.run/v1/execute`) shipped earlier; this release lets
+client code reach it.
+
+- **New `DataAPI` (`vendo.data`)** with one method, `execute(action, args?)`.
+  Posts to `https://composio-proxy.vendo.run/v1/execute` (override via the
+  constructor `dataProxyUrl` option or the `VENDO_DATA_PROXY_URL` env var).
+  Returns the unwrapped Composio result. Requires Vendo mode.
+- **Typed 403 mapping.** When the deployment isn't bound to the action's
+  toolkit, the proxy returns 403 `{error: "binding_missing", toolkit}` —
+  the SDK throws `NotConnected` (code: `binding_missing`) with the
+  toolkit slug attached. Composio passthrough errors map to
+  `UpstreamError` (code: `composio_error`).
+- **`Vendo.isVendoMode()` instance method** added to bring the client class
+  into parity with the v2 manifest (was previously only a module-level
+  export). Behaviour matches the existing `isVendoMode()` function.
+- **Surface manifest bumped** to `manifest_version: 3`, `api_version:
+  "2026-05-15"`, with a new `data_api` namespace declaring `execute` +
+  its typed errors (`binding_missing`, `action_not_found`,
+  `composio_error`).
+
 ## v1.2.0 -- 2026-05-11
 
 Stops the main entry from forcing Node-only imports into browser bundles. React + vanilla consumers can now `import { Vendo, connectUrl } from '@vendodev/sdk'` in a Vite / CF Workers / browser context without the silent `(0, import_url.fileURLToPath) is not a function` crash.

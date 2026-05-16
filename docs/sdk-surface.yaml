@@ -6,17 +6,25 @@
 # Naming: snake_case here; each SDK applies its language idiom (Python keeps
 # snake_case; TS converts to camelCase).
 #
-# v1.0 surface — extend with care; every addition is a breaking parity change
-# until both SDKs ship it.
+# v1.0 surface. Extending after release requires bumping manifest_version
+# AND landing the change in both SDKs before publishing.
 
-api_version: "2026-05-02"
-manifest_version: 1
+api_version: "2026-05-15"
+manifest_version: 3
 
 client:
-  # Methods on the top-level client class (Vendo / AsyncVendo / new Vendo()).
+  - name: "is_vendo_mode"
+    args: []
+    returns: "bool"
+    description: "True when VENDO_API_KEY is present (Vendo mode); false in BYOK/OSS mode"
+
   - name: "for_user"
     args: ["user_jwt"]
-    description: "Return a new client instance scoped to a user JWT"
+    description: "Return a new client instance scoped to a user JWT (escape hatch). Vendo mode only"
+
+  - name: "for_request"
+    args: ["headers"]
+    description: "Return a new client scoped to the X-Vendo-User-JWT extracted from request headers. Vendo mode only"
 
   - name: "token"
     args: ["slug"]
@@ -24,7 +32,7 @@ client:
 
   - name: "tokens"
     args: ["slugs"]
-    returns: "map[slug → string|null]"
+    returns: "map[slug -> string|null]"
 
   - name: "invalidate"
     args: ["slug"]
@@ -33,9 +41,9 @@ client:
   - name: "connect_url"
     args: ["slug", "*", "return_to?", "state?"]
     returns: "string"
+    description: "Vendo mode only. Path: /connections/connect/{slug}"
 
 connections_api:
-  # Methods on client.connections.
   - name: "list"
     returns: "Connection[]"
   - name: "get"
@@ -48,18 +56,63 @@ integrations_api:
   - name: "get"
     args: ["slug"]
     returns: "Integration | null"
+  - name: "env_vars"
+    args: ["slug"]
+    returns: "EnvVarMap"
+    description: "Returns BYOK env-var names for the slug. Works in any mode"
 
 billing_api:
   - name: "balance"
     returns: "Balance"
+    description: "Vendo mode only"
   - name: "spend_caps"
     returns: "SpendCaps"
+    description: "Vendo mode only"
   - name: "usage"
     args: ["*", "period?"]
     returns: "object"
+    description: "Vendo mode only"
+
+events_api:
+  - name: "subscribe"
+    returns: "AsyncIterable<Event>"
+    description: "Server-side SSE stream. Vendo mode only"
+
+webhooks_api:
+  - name: "verify"
+    args: ["headers", "body"]
+    returns: "WebhookEvent"
+    description: "HMAC verify. Works in any mode (uses VENDO_WEBHOOK_SECRET env var)"
+
+sso_api:
+  - name: "is_enabled"
+    returns: "bool"
+  - name: "identity_from_headers"
+    args: ["headers"]
+    returns: "Identity | null"
+
+deployment_api:
+  - name: "tenant_id"
+    returns: "string | null"
+  - name: "deployment_id"
+    returns: "string | null"
+  - name: "deployment_slug"
+    returns: "string | null"
+  - name: "is_running_on_vendo"
+    returns: "bool"
+
+# P5: Composio-backed action execution. Tenants call vendo.data.execute(action, args)
+# from deployed code; the request hits composio-proxy.vendo.run/v1/execute which
+# validates the bearer, resolves the toolkit's connected account, calls Composio,
+# bills via the composio.action_call meter, and returns the result. 403
+# binding_missing surfaces as NotConnected on the SDK side.
+data_api:
+  - name: "execute"
+    args: ["action", "args?"]
+    returns: "object"
+    description: "Vendo mode only. Posts to /v1/composio-proxy/execute. Errors: binding_missing, action_not_found, composio_error."
 
 errors:
-  # Each typed exception MUST be exported by both SDKs.
   - "VendoError"
   - "AuthError"
   - "NotConnected"
@@ -70,12 +123,13 @@ errors:
   - "UpstreamError"
   - "ValidationError"
   - "IdempotencyConflict"
+  - "VendoOnlyFeature"
+  - "IdentityNotPresent"
 
 testing:
-  # Required testing helpers.
-  - "MockClient"     # sync (Python) or default (TS) mock
-  - "fake_connection" # builder
-  - "MockSSE"        # scripted SSE event emitter for tests
+  - "MockClient"
+  - "fake_connection"
+  - "MockSSE"
 
 reconciler:
   - name: "bootstrap"
@@ -83,3 +137,6 @@ reconciler:
   - name: "start"
     args: ["*", "env_file", "mapping", "on_change?", "reload_url?"]
     returns: "Reconciler (with .stop())"
+  - name: "catalog_default"
+    args: ["client?"]
+    returns: "(mapping, restart_handler_factory)"
