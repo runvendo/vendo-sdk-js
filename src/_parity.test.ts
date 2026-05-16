@@ -33,8 +33,9 @@ describe("SDK surface parity (per docs/sdk-surface.yaml)", () => {
     const { IntegrationsAPI } = await import("./integrations");
     const { BillingAPI } = await import("./billing");
     for (const entry of manifest.integrations_api) {
-      expect((IntegrationsAPI.prototype as unknown as Record<string, unknown>)[entry.name],
-        `IntegrationsAPI.${entry.name} missing`).toBeDefined();
+      const name = snakeToCamel(entry.name);
+      expect((IntegrationsAPI.prototype as unknown as Record<string, unknown>)[name],
+        `IntegrationsAPI.${name} missing`).toBeDefined();
     }
     for (const entry of manifest.billing_api) {
       const name = snakeToCamel(entry.name);
@@ -63,5 +64,14 @@ describe("SDK surface parity (per docs/sdk-surface.yaml)", () => {
     const reconciler = await import("./reconciler");
     expect(reconciler.bootstrap).toBeDefined();
     expect(reconciler.start).toBeDefined();
+  });
+
+  it("DataAPI has all data_api methods", async () => {
+    const { DataAPI } = await import("./data");
+    const proto = DataAPI.prototype as unknown as Record<string, unknown>;
+    for (const entry of manifest.data_api ?? []) {
+      const name = snakeToCamel(entry.name);
+      expect(proto[name], `DataAPI.${name} missing`).toBeDefined();
+    }
   });
 });

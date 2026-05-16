@@ -5,6 +5,7 @@ import { IntegrationsAPI } from "./integrations";
 import { BillingAPI } from "./billing";
 import { WebhooksAPI } from "./webhooks";
 import { EventsAPI } from "./events";
+import { DataAPI } from "./data";
 import { connectUrl, type ConnectUrlOptions } from "./connect";
 import { requireVendoMode } from "./_mode";
 
@@ -29,6 +30,7 @@ export class Vendo {
   readonly billing: BillingAPI;
   readonly webhooks: WebhooksAPI;
   readonly events: EventsAPI;
+  readonly data: DataAPI;
 
   private _tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
@@ -71,6 +73,27 @@ export class Vendo {
     this.billing = new BillingAPI(this._http);
     this.webhooks = new WebhooksAPI();
     this.events = new EventsAPI(this._http);
+    this.data = new DataAPI({
+      apiKey: this.apiKey,
+      apiVersion: this.apiVersion,
+      fetch: this._http.fetch,
+      timeoutMs: this._http.timeoutMs,
+    });
+  }
+
+  /**
+   * Returns true when this client is operating in Vendo mode (i.e. a
+   * VENDO_API_KEY is in scope). Mirrors the top-level `isVendoMode()` export
+   * so consumers can check from an existing client instance without needing
+   * to re-resolve env. Required by the v2 surface manifest under `client:`.
+   */
+  isVendoMode(): boolean {
+    if (this.apiKey && this.apiKey.trim()) return true;
+    const env = (typeof process !== "undefined" ? process.env : {}) as Record<
+      string,
+      string | undefined
+    >;
+    return Boolean((env.VENDO_API_KEY ?? "").trim());
   }
 
   forUser(userJwt: string): Vendo {
@@ -97,6 +120,12 @@ export class Vendo {
     (child as { billing: BillingAPI }).billing = new BillingAPI(child._http);
     (child as { webhooks: WebhooksAPI }).webhooks = new WebhooksAPI();
     (child as { events: EventsAPI }).events = new EventsAPI(child._http);
+    (child as { data: DataAPI }).data = new DataAPI({
+      apiKey: this.apiKey,
+      apiVersion: this.apiVersion,
+      fetch: this._http.fetch,
+      timeoutMs: this._http.timeoutMs,
+    });
     return child;
   }
 
