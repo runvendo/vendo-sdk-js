@@ -3,13 +3,12 @@
  * Source of truth is the React package — keep in sync manually when the handshake changes.
  */
 
-/** Derive the expected postMessage origin from the SDK's baseUrl.
- *  Strips a trailing /api or /api/ path segment and returns the origin only.
+/** Derive the expected postMessage origin from a URL.
+ *  Returns protocol + host only — event.origin never includes a path.
  */
 export function expectedOrigin(baseUrl: string): string {
   const u = new URL(baseUrl);
-  const pathname = u.pathname.replace(/\/api\/?$/, "");
-  return `${u.protocol}//${u.host}${pathname === "/" ? "" : pathname}`;
+  return u.origin;
 }
 
 export interface BridgeMessageData {
